@@ -22,20 +22,20 @@ fSwissgridLuetzelsee = (701000.0, 237000.0), (699000.0, 234000.0)
 
 oruxmap = programm.OruxMap(__file__, bCopyReferenceTiles=True)
 
-for iLayer in (5000000, 2000000, 1000000, 500000):
+for iMasstab in (5000000, 2000000, 1000000, 500000):
     # Für grosse Masstäbe: die gesamte Schweiz
-    oruxmap.createLayer(None, iLayer, fSwissgridSchweiz)
+    oruxmap.createLayer(None, iMasstab, fSwissgridSchweiz)
 
-for iLayer in (200000, 100000):
+for iMasstab in (200000, 100000):
     # Mittlere Masstäbe: Nur den Kanton Zürich
-    oruxmap.createLayer(None, iLayer, fSwissgridKantonZH)
+    oruxmap.createLayer(None, iMasstab, fSwissgridKantonZH)
 
-for iLayer in (50000, 25000):
+for iMasstab in (50000, 25000):
     # Kleinere Masstäbe: Nur noch das Zürcher Oberland
-    oruxmap.createLayer(None, iLayer, fSwissgridZuercherOberland)
+    oruxmap.createLayer(None, iMasstab, fSwissgridZuercherOberland)
 
-for iLayer in (10000,):
+for iMasstab in (10000,):
     # Kleinere Masstäbe: Nur noch den Lützelsee
-    oruxmap.createLayer(None, iLayer, fSwissgridLuetzelsee)
+    oruxmap.createLayer(None, iMasstab, fSwissgridLuetzelsee)
 
 oruxmap.done()

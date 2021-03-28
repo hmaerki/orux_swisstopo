@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="3.0">
+  <MapCalibration layers="true" layerLevel="0">
+    <MapName><![CDATA[TestGeoTIFF]]></MapName>
+    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="2.1">
+      <MapCalibration layers="false" layerLevel="15">
+        <MapName><![CDATA[TestGeoTIFF 15]]></MapName>
+        <MapChunks xMax="35" yMax="24" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="400" img_width="400" file_name="TestGeoTIFF" />
+        <MapDimensions height="9600" width="14000" />
+        <MapBounds minLat="47.212188" maxLat="47.322725" minLon="8.629163" maxLon="8.857739" />
+        <CalibrationPoints>
+          <CalibrationPoint corner="TL" lon="8.629163" lat="47.322725" />
+          <CalibrationPoint corner="BR" lon="8.857739" lat="47.212188" />
+          <CalibrationPoint corner="TR" lon="8.860609" lat="47.320105" />
+          <CalibrationPoint corner="BL" lon="8.626760" lat="47.214803" />
+        </CalibrationPoints>
+      </MapCalibration>
+    </OruxTracker>
+  </MapCalibration>
+</OruxTracker>

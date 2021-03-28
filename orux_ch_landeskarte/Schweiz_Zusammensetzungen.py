@@ -36,17 +36,17 @@ fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 
 for fSwissgridKarte, oruxmap, strKarteName in listZusammensetzungen:
     oruxmap = programm.OruxMap("CH_%d_%s" % (oruxmap, strKarteName), strTopFolder="Schweiz_Zusammensetzungen")
-    for iLayer in (1000000, 500000, 200000):
+    for iMasstab in (1000000, 500000, 200000):
         # Für grosse Masstäbe: ...
         if False:
             # ... die gesamte Schweiz
-            oruxmap.createLayer(None, iLayer, fSwissgridSchweiz)
+            oruxmap.createLayer(None, iMasstab, fSwissgridSchweiz)
         else:
             # ... das entsprechende Gebiet
-            oruxmap.createLayer(None, iLayer, fSwissgridKarte)
+            oruxmap.createLayer(None, iMasstab, fSwissgridKarte)
 
-    for iLayer in (100000, 50000, 25000):
+    for iMasstab in (100000, 50000, 25000):
         # Kleinere Masstäge: Nur noch das entsprechende Gebiet
-        oruxmap.createLayer(None, iLayer, fSwissgridKarte)
+        oruxmap.createLayer(None, iMasstab, fSwissgridKarte)
 
     oruxmap.done()

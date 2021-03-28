@@ -20,7 +20,7 @@ for iLayer in (100000, 50000, 25000):
     oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 4000.0)
 oruxmap.done()
 
-oruxmap = programm.OruxMap("Testmap3", bSqlite=False, bCopyReferenceTiles=True)
+oruxmap = programm.OruxMap("Testmap3", bSqlite=False, bCopyJPG=True, bCopyReferenceTiles=True)
 for iLayer in (5000000, 2000000, 1000000, 500000, 200000):
     oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 10000.0)
 for iLayer in (100000, 50000, 25000):

@@ -22,16 +22,16 @@ fSwissgridZuercherOberland = (660000.0, 180000.0), (800000.0, 270000.0)
 
 oruxmap = programm.OruxMap(__file__)
 
-for iLayer in (1000000, 500000):
+for iMasstab in (1000000, 500000):
     # Für grosse Masstäbe: die gesamte Schweiz
-    oruxmap.createLayer(None, iLayer, fSwissgridSchweiz)
+    oruxmap.createLayer(None, iMasstab, fSwissgridSchweiz)
 
-for iLayer in (200000, 100000):
+for iMasstab in (200000, 100000):
     # Mittlere Masstäbe: Nur den Kanton Zürich
-    oruxmap.createLayer(None, iLayer, fSwissgridKantonZH)
+    oruxmap.createLayer(None, iMasstab, fSwissgridKantonZH)
 
-for iLayer in (50000, 25000):
+for iMasstab in (50000, 25000):
     # Kleinere Masstäge: Nur noch das Zürcher Oberland
-    oruxmap.createLayer(None, iLayer, fSwissgridZuercherOberland)
+    oruxmap.createLayer(None, iMasstab, fSwissgridZuercherOberland)
 
 oruxmap.done()

@@ -45,6 +45,13 @@
       "request": "launch",
       "program": "${workspaceFolder}/ZuercherOberland.py",
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: TestGeoTIFF.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/TestGeoTIFF.py",
+      "console": "integratedTerminal"
     }
   ]
 }
