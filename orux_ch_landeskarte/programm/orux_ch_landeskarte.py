@@ -45,144 +45,53 @@ from typing import List
 
 import geotiff
 
+from programm import projections
+from programm.projections import LON, LAT
+
 fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
-LON = 0
-LAT = 1
-LON_OFFSET = 2000000.0
-LAT_OFFSET = 1000000.0
-LAT_BERN = 600000.0
-LON_BERN = 200000.0
-
-def assertOrientation(fSwissgrid):
-    fA, fB = fSwissgrid
-    assert fA[0] > 2000000
-    assert fB[0] > 2000000
-    assert 1000000 < fA[1] < 2000000
-    assert 1000000 < fB[1] < 2000000
-    assert fA[0] < fB[0] # lon
-    assert fA[1] > fB[1] # lat
-
 
 @dataclass
 class LayerParams:
     iMasstab: int
     iBaseLayer: int
-    iABaseTiles: List[int]
-    iATilePixels: List[int]
-    fASwissgrid: List[float]
-    iBBaseTiles: List[int]
-    iBTilePixels: List[int]
-    fBSwissgrid: List[float]
 
 
 listLayers = (
     LayerParams(
         iMasstab=5000000,
         iBaseLayer=15,
-        # Chaumont
-        iABaseTiles=(0, 0),
-        iATilePixels=(65, 192),
-        fASwissgrid=(2452000.0, 1254750.0),
-        # Verona
-        iBBaseTiles=(3, 2),
-        iBTilePixels=(88, 98),
-        fBSwissgrid=(2848500.0, 1045250.1),
     ),
     LayerParams(
         iMasstab=2000000,
         iBaseLayer=16,
-        # Chaumont
-        iABaseTiles=(0, 0),
-        iATilePixels=(0, 0),
-        fASwissgrid=(2420000.0, 1350250.0),
-        # Verona
-        iBBaseTiles=(7, 4),
-        iBTilePixels=(128, 256),
-        fBSwissgrid=(2900000.0, 1030750.0),
     ),
     LayerParams(
         iMasstab=1000000,
         iBaseLayer=17,
-        # Chaumont
-        iABaseTiles=(0, 0),
-        iATilePixels=(0, 0),
-        fASwissgrid=(2420000.0, 1350300.0),
-        # Verona
-        iBBaseTiles=(18, 12),
-        iBTilePixels=(0, 0),
-        fBSwissgrid=(2880900.0, 1042900.0),
     ),
     LayerParams(
         iMasstab=500000,
         iBaseLayer=18,
-        # Chaumont
-        iABaseTiles=(4, 3),
-        iATilePixels=(177, 192),
-        fASwissgrid=(2480000.0, 1302000.0),
-        # Verona
-        iBBaseTiles=(34, 22),
-        iBTilePixels=(0, 0),
-        fBSwissgrid=(2855300.0, 1068400.0),
     ),
     LayerParams(
         iMasstab=200000,
         iBaseLayer=19,
-        # Chaumont
-        iABaseTiles=(8, 6),
-        iATilePixels=(113, 175),
-        fASwissgrid=(2463200.0, 1315800.0),
-        # Verona
-        iBBaseTiles=(83, 58),
-        iBTilePixels=(93, 243),
-        fBSwissgrid=(2846760.0, 1048220.0),
     ),
     LayerParams(
         iMasstab=100000,
         iBaseLayer=20,
-        # Chaumont
-        iABaseTiles=(50, 18),
-        iATilePixels=(200, 193),
-        fASwissgrid=(2550000.0, 1302000.0),
-        # Verona
-        iBBaseTiles=(132, 112),
-        iBTilePixels=(207, 128),
-        fBSwissgrid=(2760000.0, 1062000.0),
     ),
     LayerParams(
         iMasstab=50000,
         iBaseLayer=21,
-        # Chaumont
-        iABaseTiles=(101, 56),
-        iATilePixels=(144, 64),
-        fASwissgrid=(2550000.0, 1278000.0),
-        # Verona
-        iBBaseTiles=(265, 224),
-        iBTilePixels=(159, 255),
-        fBSwissgrid=(2760000.0, 1062000.0),
     ),
     LayerParams(
         iMasstab=25000,
         iBaseLayer=22,
-        # Chaumont
-        iABaseTiles=(203, 131),
-        iATilePixels=(33, 64),
-        fASwissgrid=(2550000.0, 1266000.0),
-        # Verona
-        iBBaseTiles=(613, 356),
-        iBTilePixels=(72, 64),
-        fBSwissgrid=(2812500.0, 1122000.0),
     ),
     LayerParams(
         iMasstab=10000,
         iBaseLayer=25,
-        # Chaumont
-        iABaseTiles=(574, 347),
-        iATilePixels=(55, 168),
-        fASwissgrid=(2567000.0, 1261000.0),
-        # Verona
-        iBBaseTiles=(1195, 1046),
-        iBTilePixels=(80, 225),
-        fBSwissgrid=(2726000.0, 182000.0),
     ),
 )
 
@@ -223,115 +132,6 @@ strFOLDER_MAPS = strFOLDER_ORUX_CH_LANDESKARTE / "../../orux_ch_landeskarte_maps
 strFOLDER_REFERENCE_TILES = strFOLDER_ORUX_CH_LANDESKARTE / "reference_tiles"
 strFOLDER_CACHE_TILES = strFOLDER_CACHE / "tiles"
 
-"""
-  http://www.swisstopo.ch/data/geo/naeherung_d.pdf
-  http://www.swisstopo.ch/data/geo/refsysd.pdf
-
-                  SwissGrid ???	 WGS 84
-                  N    E
-  Meilen          691  237       47.26954 8.64375
-  Hombrechtikon   700  234       47.25052 8.76696
-"""
-def transformCH1903_to_WGS84(fLon, fLat):
-    """
-    E entspricht Lambda (8.x), y (7xx)
-    N entspricht Phi (46.x), x (2xx)
-    """
-    assert isinstance(fLat, float)
-    assert isinstance(fLon, float)
-    assert fLon > LON_OFFSET
-    assert LAT_OFFSET < fLat < LON_OFFSET
-    fLat -= LAT_OFFSET
-    fLon -= LON_OFFSET
-
-    y = (fLon - LAT_BERN) / 1000000.0
-    x = (fLat - LON_BERN) / 1000000.0
-    fLambda = 2.6779094 + 4.728982 * y + 0.791484 * y * x + 0.1306 * y * x * x - 0.0436 * y * y * y
-    fPhi = 16.9023892 + 3.238272 * x - 0.270978 * y * y - 0.002528 * x * x - 0.0447 * y * y * x - 0.0140 * x * x * x
-    return fLambda * 100.0 / 36.0, fPhi * 100.0 / 36.0
-
-
-def CH1903_to_WGS84(a):
-    return transformCH1903_to_WGS84(a[LON], a[LAT])
-
-
-def add(a, b):
-    if not isinstance(a, collections.Iterable):
-        a = (a, a)
-    if not isinstance(b, collections.Iterable):
-        b = (b, b)
-    return a[0] + b[0], a[1] + b[1]
-
-
-def diff(a, b):
-    if not isinstance(a, collections.Iterable):
-        a = (a, a)
-    if not isinstance(b, collections.Iterable):
-        b = (b, b)
-    return a[0] - b[0], a[1] - b[1]
-
-
-def mult(a, b):
-    if not isinstance(a, collections.Iterable):
-        a = (a, a)
-    if not isinstance(b, collections.Iterable):
-        b = (b, b)
-    return (a[0] * b[0], a[1] * b[1])
-
-
-def div(a, b):
-    if not isinstance(a, collections.Iterable):
-        a = a, a
-    if not isinstance(b, collections.Iterable):
-        b = b, b
-    return float(a[0]) / b[0], float(a[1]) / b[1]
-
-
-def floor(a):
-    return int(math.floor(a[0])), int(math.floor(a[1]))
-
-
-def ceil(a):
-    return -int(math.floor(-a[0])), -int(math.floor(-a[1]))
-
-
-def min_(a, b):
-    if not isinstance(a, collections.Iterable):
-        a = a, a
-    if not isinstance(b, collections.Iterable):
-        b = b, b
-    return min(a[0], b[0]), min(a[1], b[1])
-
-
-def max_(a, b):
-    if not isinstance(a, collections.Iterable):
-        a = a, a
-    if not isinstance(b, collections.Iterable):
-        b = b, b
-    return max(a[0], b[0]), max(a[1], b[1])
-
-
-# a is north west of b
-def assertSwissgridIsNorthWest(a, b):
-    assert a[0] < b[0]
-    assert a[1] > b[1]
-
-
-# a is north west of b
-def assertTilesIsNorthWest(a, b):
-    assert a[0] < b[0]
-    assert a[1] < b[1]
-
-
-# a is north west of b
-def assertPixelsIsNorthWest(a, b):
-    assert a[0] < b[0]
-    assert a[1] < b[1]
-
-
-def assertWGS84IsNorthWest(a, b):
-    assert a[LON] < b[LON]
-    assert a[LAT] > b[LON]
 
 
 class OruxMap:
@@ -371,14 +171,8 @@ class OruxMap:
         self.fXml = (self.strMapFolder / f"{strMapName}.otrk2.xml").open("w")
         self.fXml.write(strTemplateMainStart.format(strMapName=strMapName))
 
-    def createLayerPlusMinus(self, iMasstab, fTargetCenterSwissgrid, fTargetSizeM):
-        fRSwissgrid = add(fTargetCenterSwissgrid, (-fTargetSizeM, fTargetSizeM))
-        fSSwissgrid = add(fTargetCenterSwissgrid, (fTargetSizeM, -fTargetSizeM))
-        assertSwissgridIsNorthWest(fRSwissgrid, fSSwissgrid)
-        self.createLayer(None, iMasstab, (fRSwissgrid, fSSwissgrid))
-
     def createLayer(self, img, iMasstab, l):
-        assertOrientation(l)
+        projections.assertOrientation(l)
         (fASwissgrid, fBSwissgrid) = l
         objLayer = Layer(self, img, iMasstab, fASwissgrid, fBSwissgrid)
         objLayer.create()
@@ -406,7 +200,7 @@ class Layer:
         self.img = img
         self.iMasstab = iMasstab
         self.verifyInput(fASwissgrid, fBSwissgrid)
-        assertSwissgridIsNorthWest(fASwissgrid, fBSwissgrid)
+        projections.assertSwissgridIsNorthWest(fASwissgrid, fBSwissgrid)
         self.fASwissgrid, self.fBSwissgrid = fASwissgrid, fBSwissgrid
         self.objLayerParams: LayerParams = self.findLayer(iMasstab)
         self.strFolderCacheTiles = strFOLDER_CACHE_TILES / f"{self.objLayerParams.iBaseLayer}"
@@ -416,10 +210,6 @@ class Layer:
         listFiles = os.listdir(self.strFolderCacheTiles)
         listFiles = filter(lambda filename: filename.endswith(".jpg"), listFiles)
         self.setTilesFiles = set(listFiles)
-
-        for layerParam in listLayers:
-            assertSwissgridIsNorthWest(layerParam.fASwissgrid, layerParam.fBSwissgrid)
-            assertTilesIsNorthWest(layerParam.iABaseTiles, layerParam.iBBaseTiles)
 
     def findLayer(self, iMasstab) -> LayerParams:
         for layerParam in listLayers:
@@ -434,7 +224,7 @@ class Layer:
 
         verifyDatatype(fUSwissgrid_)
         verifyDatatype(fVSwissgrid_)
-        assertOrientation((fUSwissgrid_, fVSwissgrid_))
+        projections.assertOrientation((fUSwissgrid_, fVSwissgrid_))
 
         # Referenzpunkte R und S ordnen: R ist 'oben links', S ist 'unten rechts'
         # untenLinks = min_(fUSwissgrid_, fVSwissgrid_)
@@ -464,58 +254,11 @@ class Layer:
         return fOut.getvalue()
 
     def create(self):  # pylint: disable=too-many-statements,too-many-branches
-        #
-        # Aufgrund der Referenzpunkte A und B bestimmen:
-        # fBaseSwissgrid: Koordinaten oben/links von Base
-        # fMPerPixel: M pro Pixel
-        #
-        # fABasePixels = add(mult(iTILE_SIZE, self.objLayerParams.iABaseTiles), self.objLayerParams.iATilePixels)
-        # fBBasePixels = add(mult(iTILE_SIZE, self.objLayerParams.iBBaseTiles), self.objLayerParams.iBTilePixels)
-
-        # fMPerPixel = div(diff(self.objLayerParams.fBSwissgrid, self.objLayerParams.fASwissgrid), diff(fBBasePixels, fABasePixels))
-        # assert fMPerPixel[0] > 0.0
-        # assert fMPerPixel[1] < 0.0
-        # torsion = (fMPerPixel[0] + fMPerPixel[1]) / fMPerPixel[0]
-        # assert torsion < 0.01
-
-        # # BaseSwissgrid ist oben/links.
-        # fBaseSwissgrid = diff(self.objLayerParams.fASwissgrid, mult(fMPerPixel, fABasePixels))
-        # assert fBaseSwissgrid[0] > 0.0
-        # assert fBaseSwissgrid[1] > 0.0
-
-        #
-        # Bestimmen, auf welchen Tiles die zu erstellende Karte (Target)
-        # zu liegen kommt.
-        # Die Punkte Bl und Tr werden bestimmt in den Koordinatensystemen
-        # iBlBasePixel: Pixel
-        # fBlSwissgrid: Swissgrid
-        # fBlWGS84: WGS84
-        #
-        # fRBasePixels = div(diff(self.fRSwissgrid, fBaseSwissgrid), fMPerPixel)
-        # fSBasePixels = div(diff(self.fSSwissgrid, fBaseSwissgrid), fMPerPixel)
-        # assertPixelsIsNorthWest(fRBasePixels, fSBasePixels)
-
-        # iTlBaseTiles = floor(div(fRBasePixels, iTILE_SIZE))
-        # iBrBaseTiles = ceil(div(fSBasePixels, iTILE_SIZE))
-        # assertTilesIsNorthWest(iTlBaseTiles, iBrBaseTiles)
-
-        # iTlBasePixel = mult(iTlBaseTiles, iTILE_SIZE)
-        # iBrBasePixel = mult(iBrBaseTiles, iTILE_SIZE)
-        # assertPixelsIsNorthWest(iTlBasePixel, iBrBasePixel)
-
-        # fTlSwissgrid = add(mult(iTlBasePixel, fMPerPixel), fBaseSwissgrid)
-        # fBrSwissgrid = add(mult(iBrBasePixel, fMPerPixel), fBaseSwissgrid)
-        # assertSwissgridIsNorthWest(fTlSwissgrid, fBrSwissgrid)
-
-        # fTlWGS84 = CH1903_to_WGS84(fTlSwissgrid)
-        # fBrWGS84 = CH1903_to_WGS84(fBrSwissgrid)
-        # fBlWGS84 = CH1903_to_WGS84((fTlSwissgrid[0], fBrSwissgrid[1]))
-        # fTrWGS84 = CH1903_to_WGS84((fBrSwissgrid[0], fTlSwissgrid[1]))
-        fTlWGS84 = CH1903_to_WGS84(self.fASwissgrid)
-        fBrWGS84 = CH1903_to_WGS84(self.fBSwissgrid)
-        fBlWGS84 = CH1903_to_WGS84((self.fASwissgrid[LON], self.fBSwissgrid[LAT]))
-        fTrWGS84 = CH1903_to_WGS84((self.fBSwissgrid[LON], self.fASwissgrid[LAT]))
-        assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
+        fTlWGS84 = projections.CH1903_to_WGS84(self.fASwissgrid)
+        fBrWGS84 = projections.CH1903_to_WGS84(self.fBSwissgrid)
+        fBlWGS84 = projections.CH1903_to_WGS84((self.fASwissgrid[LON], self.fBSwissgrid[LAT]))
+        fTrWGS84 = projections.CH1903_to_WGS84((self.fBSwissgrid[LON], self.fASwissgrid[LAT]))
+        projections.assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
 
         #
         # Die Tiles fuer die Karte zusammenkopieren
@@ -531,6 +274,8 @@ class Layer:
         yCount = self.img.height // iTILE_SIZE
         for y in range(yCount):
             for x in range(xCount):
+                # TODO: Remove
+                continue
                 if self.objOrux.bSqlite:
                     rawImagedata = self.extractTile(x, y)
                     b = sqlite3.Binary(rawImagedata)
@@ -553,7 +298,7 @@ class Layer:
             f = (self.objOrux.strMapFolder / f"{self.objOrux.strMapName} {self.objLayerParams.iBaseLayer - iLAYER_OFFSET}.otrk2.xml").open("w")
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 
-        assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
+        projections.assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
 
         f.write(
             strTemplateLayerBegin.format(
