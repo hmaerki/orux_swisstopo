@@ -12,6 +12,6 @@ for row in c:
     y = row[1]
     z = row[2]
     image = row[3]
-    open("%03d-%03d-%03d.jpg" % (x, y, z), "wb").write(image)
+    open(f"{x:03d}-{y:03d}-{z:03d}.jpg", "wb").write(image)
 
 sys.stdin.readline()

@@ -38,6 +38,13 @@
       "request": "launch",
       "program": "${file}",
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: ZuercherOberland.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/ZuercherOberland.py",
+      "console": "integratedTerminal"
     }
   ]
 }

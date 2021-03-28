@@ -1,12 +1,12 @@
 ﻿#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2010-2018 Hans Maerk, Maerki Informatik
+# Copyright (C) 2010-2021 Hans Maerk, Maerki Informatik
 # License: LGPL (http://www.gnu.org/licenses/lgpl.html)
 #
 # Siehe http://www.maerki.com/hans/orux
 #
-# Version: 1.0.4
+# Version: 1.0.5
 # History:
 #   2010-06-22, Hans Maerki, Implementiert
 #   2010-06-23, Hans Maerki, Koordinaten der Karte Massstab 1:50000 angepasst.
@@ -15,6 +15,7 @@
 #   2013-09-06, Hans Maerki, Swisstopo hat die Server gewechselt: Neue Url angepasst.
 #   2018-04-24, Hans Maerki, Swisstopo hat die Server gewechselt: Neue Logik angepasst.
 #   2019-06-03, Hans Maerki, Angepasst an Python 3.7.2.
+#   2021-03-28, Hans Maerki, Massive cleanup.
 """
 http://map.geo.admin.ch
 
@@ -39,6 +40,7 @@ import http.client
 import math
 import time
 import shutil
+import pathlib
 import urllib
 import urllib.parse
 import sqlite3
@@ -51,123 +53,136 @@ fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 LON = 0
 LAT = 1
 
+
+@dataclass
+class LayerParams:
+    iMasstab: int
+    iBaseLayer: int
+    iABaseTiles: List[int]
+    iATilePixels: List[int]
+    fASwissgrid: List[float]
+    iBBaseTiles: List[int]
+    iBTilePixels: List[int]
+    fBSwissgrid: List[float]
+
+
 listLayers = (
-    {
-        "iMasstab": 5000000,
-        "iBaseLayer": 15,
+    LayerParams(
+        iMasstab=5000000,
+        iBaseLayer=15,
         # Chaumont
-        "iABaseTiles": (0, 0),
-        "iATilePixels": (65, 192),
-        "fASwissgrid": (452000.0, 254750.0),
+        iABaseTiles=(0, 0),
+        iATilePixels=(65, 192),
+        fASwissgrid=(452000.0, 254750.0),
         # Verona
-        "iBBaseTiles": (3, 2),
-        "iBTilePixels": (88, 98),
-        "fBSwissgrid": (848500.00, 45250.15),
-    },
-    {
-        "iMasstab": 2000000,
-        "iBaseLayer": 16,
+        iBBaseTiles=(3, 2),
+        iBTilePixels=(88, 98),
+        fBSwissgrid=(848500.00, 45250.15),
+    ),
+    LayerParams(
+        iMasstab=2000000,
+        iBaseLayer=16,
         # Chaumont
-        "iABaseTiles": (0, 0),
-        "iATilePixels": (0, 0),
-        "fASwissgrid": (420000.0, 350250.0),
+        iABaseTiles=(0, 0),
+        iATilePixels=(0, 0),
+        fASwissgrid=(420000.0, 350250.0),
         # Verona
-        "iBBaseTiles": (7, 4),
-        "iBTilePixels": (128, 256),
-        "fBSwissgrid": (900000.0, 30750.0),
-    },
-    {
-        "iMasstab": 1000000,
-        "iBaseLayer": 17,
+        iBBaseTiles=(7, 4),
+        iBTilePixels=(128, 256),
+        fBSwissgrid=(900000.0, 30750.0),
+    ),
+    LayerParams(
+        iMasstab=1000000,
+        iBaseLayer=17,
         # Chaumont
-        "iABaseTiles": (0, 0),
-        "iATilePixels": (0, 0),
-        "fASwissgrid": (420000.0, 350300.0),
+        iABaseTiles=(0, 0),
+        iATilePixels=(0, 0),
+        fASwissgrid=(420000.0, 350300.0),
         # Verona
-        "iBBaseTiles": (18, 12),
-        "iBTilePixels": (0, 0),
-        "fBSwissgrid": (880900.0, 42900.0),
-    },
-    {
-        "iMasstab": 500000,
-        "iBaseLayer": 18,
+        iBBaseTiles=(18, 12),
+        iBTilePixels=(0, 0),
+        fBSwissgrid=(880900.0, 42900.0),
+    ),
+    LayerParams(
+        iMasstab=500000,
+        iBaseLayer=18,
         # Chaumont
-        "iABaseTiles": (4, 3),
-        "iATilePixels": (177, 192),
-        "fASwissgrid": (480000.0, 302000.0),
+        iABaseTiles=(4, 3),
+        iATilePixels=(177, 192),
+        fASwissgrid=(480000.0, 302000.0),
         # Verona
-        "iBBaseTiles": (34, 22),
-        "iBTilePixels": (0, 0),
-        "fBSwissgrid": (855300.0, 68400.0),
-    },
-    {
-        "iMasstab": 200000,
-        "iBaseLayer": 19,
+        iBBaseTiles=(34, 22),
+        iBTilePixels=(0, 0),
+        fBSwissgrid=(855300.0, 68400.0),
+    ),
+    LayerParams(
+        iMasstab=200000,
+        iBaseLayer=19,
         # Chaumont
-        "iABaseTiles": (8, 6),
-        "iATilePixels": (113, 175),
-        "fASwissgrid": (463200.0, 315800.0),
+        iABaseTiles=(8, 6),
+        iATilePixels=(113, 175),
+        fASwissgrid=(463200.0, 315800.0),
         # Verona
-        "iBBaseTiles": (83, 58),
-        "iBTilePixels": (93, 243),
-        "fBSwissgrid": (846760.0, 48220.0),
-    },
-    {
-        "iMasstab": 100000,
-        "iBaseLayer": 20,
+        iBBaseTiles=(83, 58),
+        iBTilePixels=(93, 243),
+        fBSwissgrid=(846760.0, 48220.0),
+    ),
+    LayerParams(
+        iMasstab=100000,
+        iBaseLayer=20,
         # Chaumont
-        "iABaseTiles": (50, 18),
-        "iATilePixels": (200, 193),
-        "fASwissgrid": (550000.0, 302000.0),
+        iABaseTiles=(50, 18),
+        iATilePixels=(200, 193),
+        fASwissgrid=(550000.0, 302000.0),
         # Verona
-        "iBBaseTiles": (132, 112),
-        "iBTilePixels": (207, 128),
-        "fBSwissgrid": (760000.0, 62000.0),
-    },
-    {
-        "iMasstab": 50000,
-        "iBaseLayer": 21,
+        iBBaseTiles=(132, 112),
+        iBTilePixels=(207, 128),
+        fBSwissgrid=(760000.0, 62000.0),
+    ),
+    LayerParams(
+        iMasstab=50000,
+        iBaseLayer=21,
         # Chaumont
-        "iABaseTiles": (101, 56),
-        "iATilePixels": (144, 64),
-        "fASwissgrid": (550000.0, 278000.0),
+        iABaseTiles=(101, 56),
+        iATilePixels=(144, 64),
+        fASwissgrid=(550000.0, 278000.0),
         # Verona
-        "iBBaseTiles": (265, 224),
-        "iBTilePixels": (159, 255),
-        "fBSwissgrid": (760000.0, 62000.0),
-    },
-    {
-        "iMasstab": 25000,
-        "iBaseLayer": 22,
+        iBBaseTiles=(265, 224),
+        iBTilePixels=(159, 255),
+        fBSwissgrid=(760000.0, 62000.0),
+    ),
+    LayerParams(
+        iMasstab=25000,
+        iBaseLayer=22,
         # Chaumont
-        "iABaseTiles": (203, 131),
-        "iATilePixels": (33, 64),
-        "fASwissgrid": (550000.0, 266000.0),
+        iABaseTiles=(203, 131),
+        iATilePixels=(33, 64),
+        fASwissgrid=(550000.0, 266000.0),
         # Verona
-        "iBBaseTiles": (613, 356),
-        "iBTilePixels": (72, 64),
-        "fBSwissgrid": (812500.0, 122000.0),
-    },
-    {
-        "iMasstab": 10000,
-        "iBaseLayer": 25,
+        iBBaseTiles=(613, 356),
+        iBTilePixels=(72, 64),
+        fBSwissgrid=(812500.0, 122000.0),
+    ),
+    LayerParams(
+        iMasstab=10000,
+        iBaseLayer=25,
         # Chaumont
-        "iABaseTiles": (574, 347),
-        "iATilePixels": (55, 168),
-        "fASwissgrid": (567000.0, 261000.0),
+        iABaseTiles=(574, 347),
+        iATilePixels=(55, 168),
+        fASwissgrid=(567000.0, 261000.0),
         # Verona
-        "iBBaseTiles": (1195, 1046),
-        "iBTilePixels": (80, 225),
-        "fBSwissgrid": (726000.0, 82000.0),
-    },
+        iBBaseTiles=(1195, 1046),
+        iBTilePixels=(80, 225),
+        fBSwissgrid=(726000.0, 82000.0),
+    ),
 )
 
 strTemplateLayerBegin = """    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="2.1">
-      <MapCalibration layers="false" layerLevel="%(id)d">
-        <MapName><![CDATA[%(strMapName)s %(id)d]]></MapName>
-        <MapChunks xMax="%(xMax)d" yMax="%(yMax)d" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="256" img_width="256" file_name="%(strMapName)s" />
-        <MapDimensions height="%(height)i" width="%(width)i" />
-        <MapBounds minLat="%(minLat)2.6f" maxLat="%(maxLat)2.6f" minLon="%(minLon)2.6f" maxLon="%(maxLon)2.6f" />
+      <MapCalibration layers="false" layerLevel="{id}">
+        <MapName><![CDATA[{strMapName} {id:d}]]></MapName>
+        <MapChunks xMax="{xMax}" yMax="{yMax}" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="{iTILE_SIZE}" img_width="{iTILE_SIZE}" file_name="{strMapName}" />
+        <MapDimensions height="{height}" width="{width}" />
+        <MapBounds minLat="{minLat:2.6f}" maxLat="{maxLat:2.6f}" minLon="{minLon:2.6f}" maxLon="{maxLon:2.6f}" />
         <CalibrationPoints>
 """
 
@@ -180,7 +195,7 @@ strTemplateLayerEnd = """        </CalibrationPoints>
 strTemplateMainStart = """<?xml version="1.0" encoding="UTF-8"?>
 <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="3.0">
   <MapCalibration layers="true" layerLevel="0">
-    <MapName><![CDATA[%(strMapName)s]]></MapName>
+    <MapName><![CDATA[{strMapName}]]></MapName>
 """
 
 strTemplateMainEnd = """  </MapCalibration>
@@ -193,11 +208,11 @@ iTILE_SIZE = 256
 # Der Unterschied ist also:
 iLAYER_OFFSET = 7
 
-strFOLDER_ORUX_CH_LANDESKARTE = os.path.dirname(__file__)
-strFOLDER_CACHE = os.path.abspath("%s/../../orux_ch_landeskarte_cache" % strFOLDER_ORUX_CH_LANDESKARTE)
-strFOLDER_REFERENCE_TILES = "%s/reference_tiles" % strFOLDER_ORUX_CH_LANDESKARTE
-strFOLDER_CACHE_TILES = "%s/tiles" % strFOLDER_CACHE
-strFOLDER_MAPS = "orux_maps"
+strFOLDER_ORUX_CH_LANDESKARTE = pathlib.Path(__file__).absolute().parent
+strFOLDER_CACHE = strFOLDER_ORUX_CH_LANDESKARTE / "../../orux_ch_landeskarte_cache"
+strFOLDER_MAPS = strFOLDER_ORUX_CH_LANDESKARTE / "../../orux_ch_landeskarte_maps"
+strFOLDER_REFERENCE_TILES = strFOLDER_ORUX_CH_LANDESKARTE / "reference_tiles"
+strFOLDER_CACHE_TILES = strFOLDER_CACHE / "tiles"
 
 """
   http://www.swisstopo.ch/data/geo/naeherung_d.pdf
@@ -306,46 +321,41 @@ def assertWGS84IsNorthWest(a, b):
 
 
 class OruxMap:
-    def __init__(self, strMapName, bSqlite=True, bCopyReferenceTiles=False, strTopFolder="."):
+    def __init__(self, strMapName, bSqlite=True, bCopyReferenceTiles=False, strTopFolder=strFOLDER_ORUX_CH_LANDESKARTE):
+        assert isinstance(strTopFolder, pathlib.Path)
         if strMapName.endswith(".py"):
             # Es wurde der Parameter __file__ uebergeben, strMapName sieht also etwa so aus: C:\data\...\Hombrechtikon.py
             strMapName = os.path.basename(strMapName).replace(".py", "")
         self.strMapName = strMapName
         self.bCopyReferenceTiles = bCopyReferenceTiles
         self.strTopFolder = strTopFolder
+        self.strMapFolder = strFOLDER_MAPS / strMapName
         self.bSqlite = bSqlite
 
         print("===== ", self.strMapName)
 
-        if os.path.exists(os.path.join(strTopFolder, strMapName)):
-            shutil.rmtree(os.path.join(strTopFolder, strMapName))
+        if self.strMapFolder.exists():
+            shutil.rmtree(self.strMapFolder)
             time.sleep(1.0)
-            os.makedirs(os.path.join(strTopFolder, strMapName))
-        if not os.path.exists(os.path.join(strTopFolder, strMapName)):
-            os.makedirs(os.path.join(strTopFolder, strMapName))
+        self.strMapFolder.mkdir(parents=True, exist_ok=True)
 
         if self.bCopyReferenceTiles:
-            if os.path.exists(os.path.join(strTopFolder, strFOLDER_REFERENCE_TILES)):
-                shutil.rmtree(os.path.join(strTopFolder, strFOLDER_REFERENCE_TILES))
+            if (strTopFolder / strFOLDER_REFERENCE_TILES).exists():
+                shutil.rmtree(strTopFolder / strFOLDER_REFERENCE_TILES)
                 time.sleep(1.0)
-            os.makedirs(os.path.join(strTopFolder, strFOLDER_REFERENCE_TILES))
+            (strTopFolder / strFOLDER_REFERENCE_TILES).mkdir(parents=True, exist_ok=True)
 
         if self.bSqlite:
-            strFilenameSqlite = os.path.join(strTopFolder, self.strMapName, "OruxMapsImages.db")
-            if os.path.exists(strFilenameSqlite):
-                os.remove(strFilenameSqlite)
+            strFilenameSqlite = self.strMapFolder / "OruxMapsImages.db"
+            if strFilenameSqlite.exists():
+                strFilenameSqlite.unlink()
             self.db = sqlite3.connect(strFilenameSqlite)
             self.db.execute("""CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))""")
             self.db.execute("""CREATE TABLE android_metadata (locale TEXT)""")
             self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
 
-        self.fXml = open(os.path.join(strTopFolder, strMapName, "%s.otrk2.xml" % strMapName), "w")
-        self.fXml.write(
-            strTemplateMainStart
-            % {
-                "strMapName": strMapName,
-            }
-        )
+        self.fXml = (self.strMapFolder / f"{strMapName}.otrk2.xml").open("w")
+        self.fXml.write(strTemplateMainStart.format(strMapName=strMapName))
 
     def createLayerPlusMinus(self, iMasstab, fTargetCenterSwissgrid, fTargetSizeM):
         fRSwissgrid = add(fTargetCenterSwissgrid, (-fTargetSizeM, fTargetSizeM))
@@ -367,22 +377,11 @@ class OruxMap:
             self.db.close()
         print("----- Fertig")
         if self.bCopyReferenceTiles:
-            print('bCopyReferenceTiles ist eingeschaltet: Die Referenztiles liegen im Ordner "%s". Beachte das rote Kreuz!' % strFOLDER_REFERENCE_TILES)
-        print('Die Karte liegt nun bereit im Ordner "%s".' % self.strMapName)
+            print(f'bCopyReferenceTiles ist eingeschaltet: Die Referenztiles liegen im Ordner "{strFOLDER_REFERENCE_TILES}". Beachte das rote Kreuz!')
+        print(f'Die Karte liegt nun bereit im Ordner "{self.strMapName}".')
         print("Dieser Ordner muss jetzt 'von Hand' in den Ordner \"oruxmaps\\mapfiles\" kopiert werden.")
         # sys.stdin.readline()
 
-@dataclass
-class LayerParams:
-    strTopFolder: str = None
-    iMasstab: int = None
-    iBaseLayer: int = None
-    iABaseTiles: List[int] = None
-    iATilePixels: List[int] = None
-    fASwissgrid: List[float] = None
-    iBBaseTiles: List[int] = None
-    iBTilePixels: List[int] = None
-    fBSwissgrid: List[float] = None
 
 class Layer:
     def __init__(self, objOrux, iMasstab, fRSwissgrid, fSSwissgrid):
@@ -391,34 +390,24 @@ class Layer:
         self.fRSwissgrid, self.fSSwissgrid = self.verifyInput(fRSwissgrid, fSSwissgrid)
         assertSwissgridIsNorthWest(self.fRSwissgrid, self.fSSwissgrid)
         self.objConnection = None
-        self.objLayerParams:LayerParams = self.findLayer(iMasstab)
-        self.strFolderCacheTiles = os.path.join(strFOLDER_CACHE_TILES, "%d" % self.objLayerParams.iBaseLayer)
-        if not os.path.exists(self.strFolderCacheTiles):
-            os.makedirs(self.strFolderCacheTiles)
-
-        self.iBaseLayer:int = None
-        self.strTopFolder: str = None
-        self.fASwissgrid: List[float] = None
-        self.fBSwissgrid: List[float] = None
-        self.iABaseTiles: List[int] = None
-        self.iATilePixels: List[int] = None
-        self.iBBaseTiles: List[int] = None
-        self.iBTilePixels: List[int] = None
+        self.objLayerParams: LayerParams = self.findLayer(iMasstab)
+        self.strFolderCacheTiles = strFOLDER_CACHE_TILES / f"{self.objLayerParams.iBaseLayer}"
+        if not self.strFolderCacheTiles.exists():
+            self.strFolderCacheTiles.mkdir(parents=True, exist_ok=True)
 
         listFiles = os.listdir(self.strFolderCacheTiles)
         listFiles = filter(lambda filename: filename.endswith(".jpg"), listFiles)
         self.setTilesFiles = set(listFiles)
 
+        for layerParam in listLayers:
+            assertSwissgridIsNorthWest(layerParam.fASwissgrid, layerParam.fBSwissgrid)
+            assertTilesIsNorthWest(layerParam.iABaseTiles, layerParam.iBBaseTiles)
+
     def findLayer(self, iMasstab) -> LayerParams:
-        for dictLayer in listLayers:
-            # TODO: fix this.
-            objLayer = LayerParams()
-            objLayer.__dict__.update(dictLayer)
-            assertSwissgridIsNorthWest(objLayer.fASwissgrid, objLayer.fBSwissgrid)
-            assertTilesIsNorthWest(objLayer.iABaseTiles, objLayer.iBBaseTiles)
-            if objLayer.iMasstab == iMasstab:
-                return objLayer
-        raise Exception("Layer mit Masstab %d existiert nicht." % iMasstab)
+        for layerParam in listLayers:
+            if layerParam.iMasstab == iMasstab:
+                return layerParam
+        raise Exception(f"Layer mit Masstab {iMasstab} existiert nicht.")
 
     def verifyInput(self, fRSwissgrid_, fSSwissgrid_):
         def verifyDatatype(pt):
@@ -427,7 +416,7 @@ class Layer:
                     return f
                 if isinstance(f, int):
                     return float(f)
-                raise Exception("Es wurde eine Gleitkommazahl erwartet, aber %s ist ein %s." % (f, str(type(f))))
+                raise Exception(f"Es wurde eine Gleitkommazahl erwartet, aber {f:f} ist ein {type(f)}.")
 
             return v(pt[0]), v(pt[1])
 
@@ -445,19 +434,19 @@ class Layer:
     def copyReferenceTiles(self):
         def copyIt(iBaseTiles, iTilePixels, fSwissgrid):
             _bDownloaded, strFilenameTile, bIsWhite = self.getTileFromCache(iBaseTiles[0], iBaseTiles[1])
-            shutil.copyfile(os.path.join(self.strFolderCacheTiles, strFilenameTile), os.path.join(strFOLDER_REFERENCE_TILES, strFilenameTile))
+            shutil.copyfile(self.strFolderCacheTiles / strFilenameTile, strFOLDER_REFERENCE_TILES / strFilenameTile)
             if True:
                 # Die Tiles im Ordner 'orux_ch_landeskarte_cache\reference_tiles' erhalten
                 # ein rotes Kreuz im Referenzpunkt
                 import PIL.Image
                 import PIL.ImageDraw
 
-                imTile = PIL.Image.open(strFOLDER_REFERENCE_TILES + "/" + strFilenameTile)
+                imTile = PIL.Image.open(strFOLDER_REFERENCE_TILES / strFilenameTile)
                 draw = PIL.ImageDraw.Draw(imTile)
                 draw.line((iTilePixels[0] - 10, iTilePixels[1] - 10, iTilePixels[0] + 10, iTilePixels[1] + 10), fill="#ff0000")
                 draw.line((iTilePixels[0] - 10, iTilePixels[1] + 10, iTilePixels[0] + 10, iTilePixels[1] - 10), fill="#ff0000")
                 del draw
-                imTile.save(os.path.join(self.objOrux.strTopFolder, strFOLDER_REFERENCE_TILES, strFilenameTile), format="JPEG")
+                imTile.save(self.objOrux.strTopFolder / strFOLDER_REFERENCE_TILES / strFilenameTile, format="JPEG")
 
         copyIt(self.objLayerParams.iABaseTiles, self.objLayerParams.iATilePixels, self.objLayerParams.fASwissgrid)
         copyIt(self.objLayerParams.iBBaseTiles, self.objLayerParams.iBTilePixels, self.objLayerParams.fBSwissgrid)
@@ -483,12 +472,12 @@ class Layer:
         result = urllib.parse.urlparse(strUrl)
         strRemoteHost = result.hostname
         strRemotePath = result.path
-        strFilenameTile = "tile_%d_%03d_%03d.jpg" % (self.objLayerParams.iBaseLayer, iTileX, iTileY)
+        strFilenameTile = f"tile_{self.objLayerParams.iBaseLayer}_{iTileX:03d}_{iTileY:03d}.jpg"
         if strFilenameTile in self.setTilesFiles:
             return False, strFilenameTile, False
 
         self.setTilesFiles.add(strFilenameTile)
-        strFilenameTileFull = os.path.join(self.strFolderCacheTiles, strFilenameTile)
+        strFilenameTileFull = self.strFolderCacheTiles / strFilenameTile
 
         dictHeaders = {
             "host": strRemoteHost,
@@ -521,11 +510,6 @@ class Layer:
                 return True, strFilenameTile, bIsWhite
             except Exception as e:  # pylint: disable=broad-except
                 print('Retry %i: Failed to open "%s": %s:%s' % (iRetry, strUrl, type(e), str(e)))
-                # if str(sys.exc_value).upper().find('HTTP Error 204: No content'.upper()) >= 0:
-                #   return False, None
-                # print('Retry %i: Failed to open "%s": %s:%s' % (iRetry, strUrl, sys.exc_type, sys.exc_value))
-                # time.sleep(2.0)
-                # self.installKeepAlive()
 
         print("Giving up %s" % strUrl)
         return False, None, False
@@ -587,11 +571,11 @@ class Layer:
         # Die Tiles fuer die Karte zusammenkopieren
         #
         if not self.objOrux.bSqlite:
-            strFolder = os.path.join(self.objOrux.strTopFolder, self.objOrux.strMapName, "%s_%d" % (self.objOrux.strMapName, self.objLayerParams.iBaseLayer - iLAYER_OFFSET))
-            if not os.path.exists(strFolder):
-                os.mkdir(strFolder)
-            if not os.path.exists(strFolder + "/set"):
-                os.mkdir(strFolder + "/set")
+            strFolder = self.objOrux.strTopFolder / self.objOrux.strMapName / f"{self.objOrux.strMapName}_{self.objLayerParams.iBaseLayer - iLAYER_OFFSET}"
+            if not strFolder.exists():
+                strFolder.mkdir(xy=True)
+            if not (strFolder / "set").exists():
+                (strFolder / "set").mkdir(parents=True, exist_ok=True)
 
         listRangeX = range(iTlBaseTiles[0], iBrBaseTiles[0])
         listRangeY = range(iTlBaseTiles[1], iBrBaseTiles[1])
@@ -609,7 +593,8 @@ class Layer:
                     continue
                 iCountTile += 1
                 if bDownloaded:
-                    print("Downloaded: Masstab 1:%d, Tile %d von %d, %s %s" % (self.objLayerParams.iMasstab, iCountTile, iCountTilesAll, strFilenameTile, "white" if bIsWhite else ""))
+                    white = "white" if bIsWhite else ""
+                    print(f"Downloaded: Masstab 1:{self.objLayerParams.iMasstab}, Tile {iCountTile} von {iCountTilesAll}, {strFilenameTile} {white}")
 
         for x, iTileX in zip(itertools.count(), listRangeX):
             for y, iTileY in zip(itertools.count(), listRangeY):
@@ -617,60 +602,60 @@ class Layer:
                 if (bDownloaded, strFilenameTile) == (False, None):
                     # Failed after some retries
                     continue
-                strFilenameTileFull = os.path.join(self.strFolderCacheTiles, strFilenameTile)
-                strFilename2 = "%s_%d_%d_%d.omc2" % (self.objOrux.strMapName, self.objLayerParams.iBaseLayer - iLAYER_OFFSET, x, yCount - y - 1)
+                strFilenameTileFull = self.strFolderCacheTiles / strFilenameTile
+                strFilename2 = f"{self.objOrux.strMapName}_{self.objLayerParams.iBaseLayer - iLAYER_OFFSET}_{x}_{yCount - y - 1}.omc2"
                 if self.objOrux.bSqlite:
-                    if os.path.exists(strFilenameTileFull):
+                    if strFilenameTileFull.exists():
                         bIsWhite = os.path.getsize(strFilenameTileFull) == 0
                         if bIsWhite:
                             # White tiles are typically at the end of a map and in big quantities.
                             # We don't write the white tiles to save disk space and in the hope, that OruxMaps handles the situation gracefully
                             continue
 
-                    with open(strFilenameTileFull, "rb") as fIn:
+                    with strFilenameTileFull.open("rb") as fIn:
                         rawImagedata = fIn.read()
                     bIsWhite_ = self.is_white_data(rawImagedata)
                     if bIsWhite_:
                         # Comment as above
                         # Replace by a emty file to speed up next time
-                        print("Shrink white tile: {}".format(strFilenameTileFull))
-                        with open(strFilenameTileFull, "wb") as _fOut:
+                        print(f"Shrink white tile: {strFilenameTileFull}")
+                        with strFilenameTileFull.open("wb") as _fOut:
                             pass
                         continue
                     b = sqlite3.Binary(rawImagedata)
                     self.objOrux.db.execute("insert or replace into tiles values (?,?,?,?)", (x, y, self.objLayerParams.iBaseLayer - iLAYER_OFFSET, b))
                 else:
                     try:
-                        strFilename2Full = os.path.join(self.objOrux.strTopFolder, "..", strFolder, "set", strFilename2)
+                        strFilename2Full = self.objOrux.strTopFolder / ".." / strFolder / "set" / strFilename2
                         shutil.copyfile(strFilenameTileFull, strFilename2Full)
-                        with open(strFilenameTileFull, "rb") as fIn:
+                        with strFilenameTileFull.open("rb") as fIn:
                             fOut = io.BytesIO()
                     except IOError as e:
-                        shutil.copyfile(strFOLDER_ORUX_CH_LANDESKARTE + "/not_found.jpg", strFilename2Full)
+                        shutil.copyfile(strFOLDER_ORUX_CH_LANDESKARTE / "not_found.jpg", strFilename2Full)
                         print("Error:", e)
 
         if self.objOrux.bSqlite:
             f = self.objOrux.fXml
         else:
-            f = open(os.path.join(self.objLayerParams.strTopFolder, strFolder, "%s %d.otrk2.xml" % (self.objOrux.strMapName, self.objLayerParams.iBaseLayer - iLAYER_OFFSET)), "w")
+            f = (self.objOrux.strMapFolder / f"{self.objOrux.strMapName} {self.objLayerParams.iBaseLayer - iLAYER_OFFSET}.otrk2.xml").open("w")
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 
         assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
 
         f.write(
-            strTemplateLayerBegin
-            % {
-                "strMapName": self.objOrux.strMapName,
-                "id": self.objLayerParams.iBaseLayer - iLAYER_OFFSET,
-                "xMax": xCount,
-                "yMax": yCount,
-                "height": yCount * iTILE_SIZE,
-                "width": xCount * iTILE_SIZE,
-                "minLat": fBrWGS84[LAT],
-                "maxLat": fTlWGS84[LAT],
-                "minLon": fTlWGS84[LON],
-                "maxLon": fBrWGS84[LON],
-            }
+            strTemplateLayerBegin.format(
+                iTILE_SIZE=iTILE_SIZE,
+                strMapName=self.objOrux.strMapName,
+                id=self.objLayerParams.iBaseLayer - iLAYER_OFFSET,
+                xMax=xCount,
+                yMax=yCount,
+                height=yCount * iTILE_SIZE,
+                width=xCount * iTILE_SIZE,
+                minLat=fBrWGS84[LAT],
+                maxLat=fTlWGS84[LAT],
+                minLon=fTlWGS84[LON],
+                maxLon=fBrWGS84[LON],
+            )
         )
         for strPoint, fLon, fLat in (
             ("TL", fTlWGS84[LON], fTlWGS84[LAT]),
@@ -678,7 +663,7 @@ class Layer:
             ("TR", fTrWGS84[LON], fTrWGS84[LAT]),
             ("BL", fBlWGS84[LON], fBlWGS84[LAT]),
         ):
-            f.write('          <CalibrationPoint corner="%s" lon="%2.6f" lat="%2.6f" />\n' % (strPoint, fLon, fLat))
+            f.write(f'          <CalibrationPoint corner="{strPoint}" lon="{fLon:2.6f}" lat="{fLat:2.6f}" />\n')
 
         f.write(strTemplateLayerEnd)
         if not self.objOrux.bSqlite:
