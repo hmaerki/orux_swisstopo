@@ -27,15 +27,15 @@ for iLayer in (5000000, 2000000, 1000000, 500000):
     map.createLayer(iLayer, fSwissgridSchweiz)
 
 for iLayer in (200000, 100000):
-  # Mittlere Masstäbe: Nur den Kanton Zürich
-  map.createLayer(iLayer, fSwissgridKantonZH)
+    # Mittlere Masstäbe: Nur den Kanton Zürich
+    map.createLayer(iLayer, fSwissgridKantonZH)
 
 for iLayer in (50000, 25000):
-  # Kleinere Masstäbe: Nur noch das Zürcher Oberland
-  map.createLayer(iLayer, fSwissgridZuercherOberland)
+    # Kleinere Masstäbe: Nur noch das Zürcher Oberland
+    map.createLayer(iLayer, fSwissgridZuercherOberland)
 
-for iLayer in (10000, ):
-  # Kleinere Masstäbe: Nur noch den Lützelsee
-  map.createLayer(iLayer, fSwissgridLuetzelsee)
+for iLayer in (10000,):
+    # Kleinere Masstäbe: Nur noch den Lützelsee
+    map.createLayer(iLayer, fSwissgridLuetzelsee)
 
 map.done()

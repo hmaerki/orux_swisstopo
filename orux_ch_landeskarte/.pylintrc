@@ -1,0 +1,112 @@
+# pylint version 2.4.4
+
+[MASTER]
+# Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
+# number of processors available to use.
+jobs=0
+extension-pkg-whitelist=numpy,wx
+
+# Add files or directories to the blacklist
+ignore=
+
+[MESSAGES CONTROL]
+
+# Disable the message, report, category or checker with the given id(s). You
+# can either give multiple identifiers separated by comma (,) or put this
+# option multiple times (only on the command line, not in the configuration
+# file where it should appear only once). You can also use "--disable=all" to
+# disable everything first and then reenable specific checks. For example, if
+# you want to run only the similarities checker, you can use "--disable=all
+# --enable=similarities". If you want to run only the classes checker, but have
+# no Warning level messages displayed, use "--disable=all --enable=classes
+# --disable=W".
+disable=
+        C0111, # missing-docstring
+        C0114, # Missing module docstring (missing-module-docstring)
+        C0103, # invalid-name
+        # C0122, # misplaced-comparison-constant
+        C0301, # Line too long
+        C0302, # too-many-lines
+        C0325, # Unnecessary parens after 'not' keyword (superfluous-parens)
+        C0326, # bad-whitespace
+        C0415, # import-outside-toplevel
+        C1801, # len-as-condition
+        # E0611, # no-name-in-module
+        # I1101, # c-extension-no-member
+        R0201, # Method could be a function (no-self-use)
+        # R0205, # useless-object-inheritance
+        R0801, # duplicate-code  # TODO: This is a very good test and a lot of code is duplicated!
+        R0902, # too-many-instance-attributes
+        R0903, # too-few-public-methods
+        # R0904, # too-many-public-methods
+        # R0911, # too-many-return-statements
+        # R0912, # too-many-branches
+        # R0913, # too-many-arguments
+        R0914, # too-many-locals
+        # R0915, # too-many-statements
+        # R1702, # too-many-nested-blocks
+        # R1715, # consider-using-get
+        # W0105, # pointless-string-statement
+        # W0108, # unnecessary-lambda
+        W0125, # using-constant-test
+        W0212, # protected-access
+        W0511, # fixme
+        W0613, # unused-argument
+        W0612, # unused-variable
+        # W0621, # redefined-outer-name
+        # W0107, # unnecessary-pass
+        # W0703, # broad-except
+        W1202, # logging-format-interpolation
+
+[REPORTS]
+# The following line displays the '\' - which is wrong, but I did not find out a way how to avoid id
+msg-template={path}:{line}: [{msg_id}({symbol}), {obj}]              \# pylint: disable={symbol} \# {msg}
+reports=no
+
+[REFACTORING]
+
+[BASIC]
+# Include a hint for the correct naming format with invalid-name
+include-naming-hint=yes
+
+# Good variable names which should always be accepted, separated by a comma.
+good-names=
+        Pxx, Pxx_n, Pxx_sum, 
+        dt_s, stepsize_bins_count, stepsize_bins_V,
+        V, samples_V,
+        P, __Pxx_n, __Pxx_sum,
+        frequencies, fmax_Hz, f_high_limit_Hz, f_low_limit_HzV,
+        f_low_limit_Hz,
+        sine_freq_Hzm, maxNyquistHz, noise_density_V_sqrtHz, sine_amp_V_rms
+        d, r, s, t,
+        logger,
+
+# Regular expression matching correct module names
+module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
+# module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
+# module-rgx=[a-zA-Z0-9_]+$
+
+# Regular expression matching correct variable names
+variable-rgx=([a-z_][a-z0-9_]{0,30}|(zi[A-Z][a-zA-Z0-9]+))$
+
+[FORMAT]
+
+[LOGGING]
+
+[MISCELLANEOUS]
+
+[SIMILARITIES]
+
+[SPELLING]
+
+[TYPECHECK]
+
+[VARIABLES]
+
+[CLASSES]
+
+[DESIGN]
+
+[IMPORTS]
+
+[EXCEPTIONS]

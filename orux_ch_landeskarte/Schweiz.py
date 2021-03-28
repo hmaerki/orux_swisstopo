@@ -19,19 +19,19 @@
 #
 import programm
 
-fSwissgridKarte = (480000.0, 70000.0),  (840000.0, 300000.0)
+fSwissgridKarte = (480000.0, 70000.0), (840000.0, 300000.0)
 
 for strTopFolder, strKartenName, listLayer in (
-      # 1.9 GByte
-      ('Schweiz_4GByte', '25000_only', (25000,)),
-      # 4.0 GByte
-      ('Schweiz_4GByte', '50000_and_up', (5000000, 2000000, 1000000, 500000, 200000, 100000, 50000)),
-      # 5.9 GByte
-      ('Schweiz', '25000', (5000000, 2000000, 1000000, 500000, 200000, 100000, 50000, 25000)),
-    ):
-  map = programm.OruxMap('CH_%s' % strKartenName, strTopFolder=strTopFolder, bSqlite=True, bDrawTileBorders=False, bCopyReferenceTiles=True, bJustDownloadTiles=False)
+    # 1.9 GByte
+    ("Schweiz_4GByte", "25000_only", (25000,)),
+    # 4.0 GByte
+    ("Schweiz_4GByte", "50000_and_up", (5000000, 2000000, 1000000, 500000, 200000, 100000, 50000)),
+    # 5.9 GByte
+    ("Schweiz", "25000", (5000000, 2000000, 1000000, 500000, 200000, 100000, 50000, 25000)),
+):
+    map = programm.OruxMap("CH_%s" % strKartenName, strTopFolder=strTopFolder, bSqlite=True, bDrawTileBorders=False, bCopyReferenceTiles=True, bJustDownloadTiles=False)
 
-  for iLayer in listLayer:
-    map.createLayer(iLayer, fSwissgridKarte)
+    for iLayer in listLayer:
+        map.createLayer(iLayer, fSwissgridKarte)
 
-  map.done()
+    map.done()

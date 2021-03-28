@@ -5,6 +5,34 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Lint",
+      "type": "python",
+      "request": "launch",
+      "module": "pylint",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--rcfile=${workspaceFolder}/.pylintrc",
+        "--verbose",
+        "*.py",
+        "programm"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Black",
+      "type": "python",
+      "request": "launch",
+      "module": "black",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--config",
+        "${workspaceFolder}/.blackconfig.yaml",
+        "*.py",
+        "programm/*.py"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Python: Current File",
       "type": "python",
       "request": "launch",
