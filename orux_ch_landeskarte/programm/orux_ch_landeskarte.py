@@ -33,19 +33,19 @@ http://www.ahnungslos.ch/android-screenshots-in-5-schritten/
 """
 import os
 import io
-import sys
 import ssl
 import http
 import http.client
 import math
 import time
-import types
 import shutil
 import urllib
 import urllib.parse
 import sqlite3
 import itertools
 import collections
+from dataclasses import dataclass
+from typing import List
 
 fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 LON = 0
@@ -162,7 +162,6 @@ listLayers = (
     },
 )
 
-
 strTemplateLayerBegin = """    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="2.1">
       <MapCalibration layers="false" layerLevel="%(id)d">
         <MapName><![CDATA[%(strMapName)s %(id)d]]></MapName>
@@ -203,8 +202,8 @@ strFOLDER_MAPS = "orux_maps"
 """
   http://www.swisstopo.ch/data/geo/naeherung_d.pdf
   http://www.swisstopo.ch/data/geo/refsysd.pdf
-  
-  SwissGrid ???		WGS 84	
+
+  SwissGrid ???		WGS 84
     N E
 Meilen	691	237	47.26954	8.64375
 Hombrechtikon	700	234	47.25052	8.76696
@@ -307,29 +306,16 @@ def assertWGS84IsNorthWest(a, b):
 
 
 class OruxMap:
-    def __init__(self, strMapName, bSqlite=True, bCopyJPG=False, bDrawTileBorders=False, bCopyReferenceTiles=False, bJustDownloadTiles=False, strTopFolder="."):
+    def __init__(self, strMapName, bSqlite=True, bCopyReferenceTiles=False, strTopFolder="."):
         if strMapName.endswith(".py"):
             # Es wurde der Parameter __file__ uebergeben, strMapName sieht also etwa so aus: C:\data\...\Hombrechtikon.py
             strMapName = os.path.basename(strMapName).replace(".py", "")
         self.strMapName = strMapName
-        self.bCopyJPG = bCopyJPG
-        self.bDrawTileBorders = bDrawTileBorders
         self.bCopyReferenceTiles = bCopyReferenceTiles
-        self.bJustDownloadTiles = bJustDownloadTiles
         self.strTopFolder = strTopFolder
         self.bSqlite = bSqlite
 
         print("===== ", self.strMapName)
-
-        if self.bDrawTileBorders or self.bCopyReferenceTiles:
-            try:
-                from PIL import Image
-            except ImportError as _e:
-                print("WARNUNG: PIL ist nicht installiert.")
-                print('WARNUNG: Die Optionen "bDrawTileBorders" und "bCopyReferenceTiles" wurden darum ausgeschaltet!')
-                print("WARNUNG: Bitte installiere: http://www.pythonware.com/products/pil")
-                self.bDrawTileBorders = False
-                self.bCopyReferenceTiles = False
 
         if os.path.exists(os.path.join(strTopFolder, strMapName)):
             shutil.rmtree(os.path.join(strTopFolder, strMapName))
@@ -382,14 +368,21 @@ class OruxMap:
         print("----- Fertig")
         if self.bCopyReferenceTiles:
             print('bCopyReferenceTiles ist eingeschaltet: Die Referenztiles liegen im Ordner "%s". Beachte das rote Kreuz!' % strFOLDER_REFERENCE_TILES)
-        if self.bCopyJPG:
-            print('bCopyJPG ist eingeschaltet: Für jeden Layer wurde ein Ordner "JPG" mit jpg-Datein erstellt. Achtung - dies braucht unnoetig Platz.')
-        if self.bDrawTileBorders:
-            print("bDrawTileBorders ist eingeschaltet: Jedes Tile hat einen roten Rahmen und die Tile-Koordinaten. Achtung - langsam - bitte nur zu Testzwecken einschalten")
         print('Die Karte liegt nun bereit im Ordner "%s".' % self.strMapName)
         print("Dieser Ordner muss jetzt 'von Hand' in den Ordner \"oruxmaps\\mapfiles\" kopiert werden.")
         # sys.stdin.readline()
 
+@dataclass
+class LayerParams:
+    strTopFolder: str = None
+    iMasstab: int = None
+    iBaseLayer: int = None
+    iABaseTiles: List[int] = None
+    iATilePixels: List[int] = None
+    fASwissgrid: List[float] = None
+    iBBaseTiles: List[int] = None
+    iBTilePixels: List[int] = None
+    fBSwissgrid: List[float] = None
 
 class Layer:
     def __init__(self, objOrux, iMasstab, fRSwissgrid, fSSwissgrid):
@@ -398,22 +391,28 @@ class Layer:
         self.fRSwissgrid, self.fSSwissgrid = self.verifyInput(fRSwissgrid, fSSwissgrid)
         assertSwissgridIsNorthWest(self.fRSwissgrid, self.fSSwissgrid)
         self.objConnection = None
-        self.objLayer = self.findLayer(iMasstab)
-        self.strFolderCacheTiles = os.path.join(strFOLDER_CACHE_TILES, "%d" % self.objLayer.iBaseLayer)
+        self.objLayerParams:LayerParams = self.findLayer(iMasstab)
+        self.strFolderCacheTiles = os.path.join(strFOLDER_CACHE_TILES, "%d" % self.objLayerParams.iBaseLayer)
         if not os.path.exists(self.strFolderCacheTiles):
             os.makedirs(self.strFolderCacheTiles)
+
+        self.iBaseLayer:int = None
+        self.strTopFolder: str = None
+        self.fASwissgrid: List[float] = None
+        self.fBSwissgrid: List[float] = None
+        self.iABaseTiles: List[int] = None
+        self.iATilePixels: List[int] = None
+        self.iBBaseTiles: List[int] = None
+        self.iBTilePixels: List[int] = None
 
         listFiles = os.listdir(self.strFolderCacheTiles)
         listFiles = filter(lambda filename: filename.endswith(".jpg"), listFiles)
         self.setTilesFiles = set(listFiles)
 
-    def findLayer(self, iMasstab):
+    def findLayer(self, iMasstab) -> LayerParams:
         for dictLayer in listLayers:
-
-            class Layer:
-                pass
-
-            objLayer = Layer()
+            # TODO: fix this.
+            objLayer = LayerParams()
             objLayer.__dict__.update(dictLayer)
             assertSwissgridIsNorthWest(objLayer.fASwissgrid, objLayer.fBSwissgrid)
             assertTilesIsNorthWest(objLayer.iABaseTiles, objLayer.iBBaseTiles)
@@ -460,8 +459,8 @@ class Layer:
                 del draw
                 imTile.save(os.path.join(self.objOrux.strTopFolder, strFOLDER_REFERENCE_TILES, strFilenameTile), format="JPEG")
 
-        copyIt(self.objLayer.iABaseTiles, self.objLayer.iATilePixels, self.objLayer.fASwissgrid)
-        copyIt(self.objLayer.iBBaseTiles, self.objLayer.iBTilePixels, self.objLayer.fBSwissgrid)
+        copyIt(self.objLayerParams.iABaseTiles, self.objLayerParams.iATilePixels, self.objLayerParams.fASwissgrid)
+        copyIt(self.objLayerParams.iBBaseTiles, self.objLayerParams.iBTilePixels, self.objLayerParams.fBSwissgrid)
 
     def is_white_data(self, image_data):
         try:
@@ -476,39 +475,15 @@ class Layer:
         del imTile
         return white
 
-    def drawTileBorder(self, strFilename, iTileX, iTileY, x, y):
-        if not self.bDrawTileBorders:
-            return
-        with io.BytesIO() as fOut:
-            with open(strFilenameTileFull, "rb") as fIn:
-                drawTileBorderPil(fIn, fOut)
-            open(strFilenameTileFull, "wb").write(fOut.getvalue())
-
-        imTile.save(strFilename, format="JPEG")
-
-    def drawTileBorderPil(self, fIn, fOut, iTileX, iTileY, x, y):
-        import PIL.Image
-        import PIL.ImageDraw
-
-        imTile = PIL.Image.open(fIn)
-        if True:
-            draw = PIL.ImageDraw.Draw(imTile)
-            draw.line((0, 0, 0, imTile.size[1]), fill="#ff0000")
-            draw.line((0, 0, imTile.size[0], 0), fill="#ff0000")
-            draw.rectangle((8, 8, 120, 22), fill="#ffffff", outline="#ffffff")
-            draw.text((10, 10), "%03i-%03i-%03i %02i-%02i" % (self.objLayer.iBaseLayer, iTileX, iTileY, x, y), fill="#ff0000")
-            del draw
-        imTile.save(fOut, format="JPEG")
-
     def getTileFromCache(self, iTileX, iTileY):
-        # strUrl = 'http://wmts4.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/20130213/21781/%d/%d/%d.jpeg' % (self.objLayer.iBaseLayer, iTileX, iTileY)
+        # strUrl = 'http://wmts4.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/20130213/21781/%d/%d/%d.jpeg' % (self.objLayerParams.iBaseLayer, iTileX, iTileY)
         #           http://wmts4.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/20130213/21781/22/261/373.jpeg
-        # strUrl = 'https://wmts100.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/2056/21/220/87.jpeg' % (self.objLayer.iBaseLayer, iTileX, iTileY)
-        strUrl = "https://wmts100.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/2056/%d/%d/%d.jpeg" % (self.objLayer.iBaseLayer, iTileX, iTileY)
+        # strUrl = 'https://wmts100.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/2056/21/220/87.jpeg' % (self.objLayerParams.iBaseLayer, iTileX, iTileY)
+        strUrl = f"https://wmts100.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/2056/{self.objLayerParams.iBaseLayer}/{iTileX}/{iTileY}.jpeg"
         result = urllib.parse.urlparse(strUrl)
         strRemoteHost = result.hostname
         strRemotePath = result.path
-        strFilenameTile = "tile_%d_%03d_%03d.jpg" % (self.objLayer.iBaseLayer, iTileX, iTileY)
+        strFilenameTile = "tile_%d_%03d_%03d.jpg" % (self.objLayerParams.iBaseLayer, iTileX, iTileY)
         if strFilenameTile in self.setTilesFiles:
             return False, strFilenameTile, False
 
@@ -526,7 +501,7 @@ class Layer:
             "connection": "keep-alive",
         }
 
-        if self.objConnection == None:
+        if self.objConnection is None:
             sslContext = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
             self.objConnection = http.client.HTTPSConnection(strRemoteHost, context=sslContext)
         self.objConnection.request("GET", strRemotePath, headers=dictHeaders)
@@ -544,7 +519,7 @@ class Layer:
                     f.write(data)
                 del response
                 return True, strFilenameTile, bIsWhite
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 print('Retry %i: Failed to open "%s": %s:%s' % (iRetry, strUrl, type(e), str(e)))
                 # if str(sys.exc_value).upper().find('HTTP Error 204: No content'.upper()) >= 0:
                 #   return False, None
@@ -555,7 +530,7 @@ class Layer:
         print("Giving up %s" % strUrl)
         return False, None, False
 
-    def create(self):
+    def create(self):  # pylint: disable=too-many-statements,too-many-branches
         if self.objOrux.bCopyReferenceTiles:
             self.copyReferenceTiles()
 
@@ -564,17 +539,17 @@ class Layer:
         # fBaseSwissgrid: Koordinaten oben/links von Base
         # fMPerPixel: M pro Pixel
         #
-        fABasePixels = add(mult(iTILE_SIZE, self.objLayer.iABaseTiles), self.objLayer.iATilePixels)
-        fBBasePixels = add(mult(iTILE_SIZE, self.objLayer.iBBaseTiles), self.objLayer.iBTilePixels)
+        fABasePixels = add(mult(iTILE_SIZE, self.objLayerParams.iABaseTiles), self.objLayerParams.iATilePixels)
+        fBBasePixels = add(mult(iTILE_SIZE, self.objLayerParams.iBBaseTiles), self.objLayerParams.iBTilePixels)
 
-        fMPerPixel = div(diff(self.objLayer.fBSwissgrid, self.objLayer.fASwissgrid), diff(fBBasePixels, fABasePixels))
+        fMPerPixel = div(diff(self.objLayerParams.fBSwissgrid, self.objLayerParams.fASwissgrid), diff(fBBasePixels, fABasePixels))
         assert fMPerPixel[0] > 0.0
         assert fMPerPixel[1] < 0.0
         torsion = (fMPerPixel[0] + fMPerPixel[1]) / fMPerPixel[0]
         assert torsion < 0.01
 
         # BaseSwissgrid ist oben/links.
-        fBaseSwissgrid = diff(self.objLayer.fASwissgrid, mult(fMPerPixel, fABasePixels))
+        fBaseSwissgrid = diff(self.objLayerParams.fASwissgrid, mult(fMPerPixel, fABasePixels))
         assert fBaseSwissgrid[0] > 0.0
         assert fBaseSwissgrid[1] > 0.0
 
@@ -612,14 +587,11 @@ class Layer:
         # Die Tiles fuer die Karte zusammenkopieren
         #
         if not self.objOrux.bSqlite:
-            strFolder = os.path.join(self.objOrux.strTopFolder, self.objOrux.strMapName, "%s_%d" % (self.objOrux.strMapName, self.objLayer.iBaseLayer - iLAYER_OFFSET))
+            strFolder = os.path.join(self.objOrux.strTopFolder, self.objOrux.strMapName, "%s_%d" % (self.objOrux.strMapName, self.objLayerParams.iBaseLayer - iLAYER_OFFSET))
             if not os.path.exists(strFolder):
                 os.mkdir(strFolder)
             if not os.path.exists(strFolder + "/set"):
                 os.mkdir(strFolder + "/set")
-            if self.objOrux.bCopyJPG:
-                if not os.path.exists(strFolder + "/jpg"):
-                    os.mkdir(strFolder + "/jpg")
 
         listRangeX = range(iTlBaseTiles[0], iBrBaseTiles[0])
         listRangeY = range(iTlBaseTiles[1], iBrBaseTiles[1])
@@ -627,7 +599,7 @@ class Layer:
         iCountTilesAll = xCount * yCount
         iCountTile = 0
 
-        print("----- Layer %d, Masstab 1:%d, %d*%d=%d Tiles" % (self.objLayer.iBaseLayer, self.objLayer.iMasstab, xCount, yCount, xCount * yCount))
+        print(f"----- Layer {self.objLayerParams.iBaseLayer}, Masstab 1:{self.objLayerParams.iMasstab}, {xCount}*{yCount}={xCount*yCount} Tiles")
 
         for x, iTileX in zip(itertools.count(), listRangeX):
             for y, iTileY in zip(itertools.count(), listRangeY):
@@ -637,10 +609,7 @@ class Layer:
                     continue
                 iCountTile += 1
                 if bDownloaded:
-                    print("Downloaded: Masstab 1:%d, Tile %d von %d, %s %s" % (self.objLayer.iMasstab, iCountTile, iCountTilesAll, strFilenameTile, "white" if bIsWhite else ""))
-
-        if self.objOrux.bJustDownloadTiles:
-            return
+                    print("Downloaded: Masstab 1:%d, Tile %d von %d, %s %s" % (self.objLayerParams.iMasstab, iCountTile, iCountTilesAll, strFilenameTile, "white" if bIsWhite else ""))
 
         for x, iTileX in zip(itertools.count(), listRangeX):
             for y, iTileY in zip(itertools.count(), listRangeY):
@@ -649,7 +618,7 @@ class Layer:
                     # Failed after some retries
                     continue
                 strFilenameTileFull = os.path.join(self.strFolderCacheTiles, strFilenameTile)
-                strFilename2 = "%s_%d_%d_%d.omc2" % (self.objOrux.strMapName, self.objLayer.iBaseLayer - iLAYER_OFFSET, x, yCount - y - 1)
+                strFilename2 = "%s_%d_%d_%d.omc2" % (self.objOrux.strMapName, self.objLayerParams.iBaseLayer - iLAYER_OFFSET, x, yCount - y - 1)
                 if self.objOrux.bSqlite:
                     if os.path.exists(strFilenameTileFull):
                         bIsWhite = os.path.getsize(strFilenameTileFull) == 0
@@ -659,12 +628,7 @@ class Layer:
                             continue
 
                     with open(strFilenameTileFull, "rb") as fIn:
-                        if self.objOrux.bDrawTileBorders:
-                            fOut = io.BytesIO()
-                            self.drawTileBorderPil(fIn, fOut, iTileX, iTileY, x, y)
-                            rawImagedata = fOut.getvalue()
-                        else:
-                            rawImagedata = fIn.read()
+                        rawImagedata = fIn.read()
                     bIsWhite_ = self.is_white_data(rawImagedata)
                     if bIsWhite_:
                         # Comment as above
@@ -674,20 +638,13 @@ class Layer:
                             pass
                         continue
                     b = sqlite3.Binary(rawImagedata)
-                    self.objOrux.db.execute("insert or replace into tiles values (?,?,?,?)", (x, y, self.objLayer.iBaseLayer - iLAYER_OFFSET, b))
+                    self.objOrux.db.execute("insert or replace into tiles values (?,?,?,?)", (x, y, self.objLayerParams.iBaseLayer - iLAYER_OFFSET, b))
                 else:
                     try:
                         strFilename2Full = os.path.join(self.objOrux.strTopFolder, "..", strFolder, "set", strFilename2)
                         shutil.copyfile(strFilenameTileFull, strFilename2Full)
                         with open(strFilenameTileFull, "rb") as fIn:
                             fOut = io.BytesIO()
-                            self.drawTileBorderPil(fIn, fOut, iTileX, iTileY, x, yCount - y - 1)
-                        if True:  # self.bCopyJPG:
-                            strDirectoryJpg = os.path.join(self.objOrux.strTopFolder, "..", strFolder, "jpg")
-                            if not os.path.exists(strDirectoryJpg):
-                                os.makedirs(strDirectoryJpg)
-                            strFilename2FullJpg = os.path.join(strDirectoryJpg, strFilename2.replace(".omc2", ".jpg"))
-                            shutil.copyfile(strFilename2Full, strFilename2FullJpg)
                     except IOError as e:
                         shutil.copyfile(strFOLDER_ORUX_CH_LANDESKARTE + "/not_found.jpg", strFilename2Full)
                         print("Error:", e)
@@ -695,7 +652,7 @@ class Layer:
         if self.objOrux.bSqlite:
             f = self.objOrux.fXml
         else:
-            f = open(os.path.join(self.objLayer.strTopFolder, strFolder, "%s %d.otrk2.xml" % (self.objOrux.strMapName, self.objLayer.iBaseLayer - iLAYER_OFFSET)), "w")
+            f = open(os.path.join(self.objLayerParams.strTopFolder, strFolder, "%s %d.otrk2.xml" % (self.objOrux.strMapName, self.objLayerParams.iBaseLayer - iLAYER_OFFSET)), "w")
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 
         assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
@@ -704,7 +661,7 @@ class Layer:
             strTemplateLayerBegin
             % {
                 "strMapName": self.objOrux.strMapName,
-                "id": self.objLayer.iBaseLayer - iLAYER_OFFSET,
+                "id": self.objLayerParams.iBaseLayer - iLAYER_OFFSET,
                 "xMax": xCount,
                 "yMax": yCount,
                 "height": yCount * iTILE_SIZE,
@@ -729,27 +686,27 @@ class Layer:
 
 
 if False:
-    map = OruxMap("Hombrechtikon")
+    oruxmap = OruxMap("Hombrechtikon")
     for iBaseLayer in (22,):
-        map.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
+        oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
 
 if False:
-    map = OruxMap("Hombrechtikon")
+    oruxmap = OruxMap("Hombrechtikon")
     for iBaseLayer in (17, 18, 19):
-        map.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 10000.0)
+        oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 10000.0)
     for iBaseLayer in (20, 21, 22):
-        map.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
+        oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
 
 if False:
-    map = OruxMap("RefBl")
+    oruxmap = OruxMap("RefBl")
     for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
-        map.createLayerPlusMinus(iBaseLayer, (481000.0, 110000.0), 2000.0)
+        oruxmap.createLayerPlusMinus(iBaseLayer, (481000.0, 110000.0), 2000.0)
 
-    map = OruxMap("RefTr")
+    oruxmap = OruxMap("RefTr")
     for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
-        map.createLayerPlusMinus(iBaseLayer, (776000.0, 276000.0), 2000.0)
+        oruxmap.createLayerPlusMinus(iBaseLayer, (776000.0, 276000.0), 2000.0)
 
 if False:
-    map = OruxMap("RefLuetzel")
+    oruxmap = OruxMap("RefLuetzel")
     for iBaseLayer in (16,):
-        map.createLayerPlusMinus(iBaseLayer, (700000.0, 236000.0), 2000.0)
+        oruxmap.createLayerPlusMinus(iBaseLayer, (700000.0, 236000.0), 2000.0)

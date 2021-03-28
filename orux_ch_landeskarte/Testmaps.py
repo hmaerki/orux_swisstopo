@@ -6,23 +6,23 @@
 
 import programm
 
-map = programm.OruxMap("Testmap1", bSqlite=True)
+oruxmap = programm.OruxMap("Testmap1", bSqlite=True)
 for iLayer in (1000000, 500000, 200000):
-    map.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 10000.0)
+    oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 10000.0)
 for iLayer in (100000, 50000, 25000):
-    map.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 4000.0)
-map.done()
+    oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 4000.0)
+oruxmap.done()
 
-map = programm.OruxMap("Testmap2", bSqlite=False)
+oruxmap = programm.OruxMap("Testmap2", bSqlite=False)
 for iLayer in (1000000, 500000, 200000):
-    map.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 10000.0)
+    oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 10000.0)
 for iLayer in (100000, 50000, 25000):
-    map.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 4000.0)
-map.done()
+    oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 4000.0)
+oruxmap.done()
 
-map = programm.OruxMap("Testmap3", bSqlite=False, bCopyJPG=True, bDrawTileBorders=True, bCopyReferenceTiles=True)
+oruxmap = programm.OruxMap("Testmap3", bSqlite=False, bCopyReferenceTiles=True)
 for iLayer in (5000000, 2000000, 1000000, 500000, 200000):
-    map.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 10000.0)
+    oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 10000.0)
 for iLayer in (100000, 50000, 25000):
-    map.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 4000.0)
-map.done()
+    oruxmap.createLayerPlusMinus(iLayer, (701000.0, 235000.0), 4000.0)
+oruxmap.done()

@@ -1,1 +1,1 @@
-from .orux_ch_landeskarte import *
+from .orux_ch_landeskarte import OruxMap
