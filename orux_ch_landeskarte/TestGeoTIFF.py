@@ -17,6 +17,7 @@ import rasterio
 import PIL.Image
 
 import programm
+from programm.projection import CH1903, BoundsCH1903
 
 filename = "/home/maerki/versuche_orux/orux/swiss-map-raster25_2013_1112_komb_1.25_2056.tif"
 
@@ -31,22 +32,12 @@ with rasterio.open(filename, "r") as dataset:
 
     with PIL.Image.open(filename) as img:
 
-
-        left = dataset.bounds.left
-        right = dataset.bounds.right
-        bottom = dataset.bounds.bottom
-        top = dataset.bounds.top
-        fASwissgrid = (left, top)
-        fBSwissgrid = (right, bottom)
-
-        fSwissgridCurrentImage = fASwissgrid, fBSwissgrid
-        # ((690000.0, 230000.0), (707500.0, 242000.0))
-
+        boundsCH1903 = BoundsCH1903(CH1903(dataset.bounds.left, dataset.bounds.top), CH1903(dataset.bounds.right, dataset.bounds.bottom))
 
         oruxmap = programm.OruxMap(__file__)
 
         for iMasstab in (25000,):
             # Kleinere Masstäbe: Nur noch das Zürcher Oberland
-            oruxmap.createLayer(img, iMasstab, fSwissgridCurrentImage)
+            oruxmap.createLayer(img, iMasstab, boundsCH1903)
 
         oruxmap.done()

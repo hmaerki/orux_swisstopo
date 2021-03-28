@@ -23,7 +23,7 @@ http://gpso.de/navigation/utm.html
   UTM- Koordinatensystem, WGS84- Kartendatum
 http://de.wikipedia.org/wiki/Kartendatum
   Geodaetisches Datum
-http://www.swisstopo.admin.ch/internet/swisstopo/de/home/topics/survey/sys/refsys/projections.html
+http://www.swisstopo.admin.ch/internet/swisstopo/de/home/topics/survey/sys/refsys/projection.html
   Schweizerische Kartenprojektionen
 http://www.swisstopo.admin.ch/internet/swisstopo/de/home/apps/calc/navref.html
   Umrechnung von Schweizer Landeskoordinaten in ellipsoidische WGS84-Koordinaten
@@ -45,8 +45,8 @@ from typing import List
 
 import geotiff
 
-from programm import projections
-from programm.projections import LON, LAT
+from programm import projection
+from programm.projection import LON, LAT, CH1903, BoundsCH1903
 
 fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 
@@ -171,10 +171,9 @@ class OruxMap:
         self.fXml = (self.strMapFolder / f"{strMapName}.otrk2.xml").open("w")
         self.fXml.write(strTemplateMainStart.format(strMapName=strMapName))
 
-    def createLayer(self, img, iMasstab, l):
-        projections.assertOrientation(l)
-        (fASwissgrid, fBSwissgrid) = l
-        objLayer = Layer(self, img, iMasstab, fASwissgrid, fBSwissgrid)
+    def createLayer(self, img, iMasstab, boundsCH1903: BoundsCH1903):
+        assert isinstance(boundsCH1903, BoundsCH1903)
+        objLayer = Layer(self, img, iMasstab, boundsCH1903)
         objLayer.create()
 
     def done(self):
@@ -193,15 +192,14 @@ class OruxMap:
 
 
 class Layer:
-    def __init__(self, objOrux, img, iMasstab, fASwissgrid, fBSwissgrid):  # pylint: disable=too-many-arguments
+    def __init__(self, objOrux, img, iMasstab, boundsCH1903: BoundsCH1903):  # pylint: disable=too-many-arguments
         # TODO
         assert img is not None
         self.objOrux = objOrux
         self.img = img
         self.iMasstab = iMasstab
-        self.verifyInput(fASwissgrid, fBSwissgrid)
-        projections.assertSwissgridIsNorthWest(fASwissgrid, fBSwissgrid)
-        self.fASwissgrid, self.fBSwissgrid = fASwissgrid, fBSwissgrid
+        projection.assertSwissgridIsNorthWest(boundsCH1903)
+        self.boundsCH1903 = boundsCH1903
         self.objLayerParams: LayerParams = self.findLayer(iMasstab)
         self.strFolderCacheTiles = strFOLDER_CACHE_TILES / f"{self.objLayerParams.iBaseLayer}"
         if not self.strFolderCacheTiles.exists():
@@ -216,23 +214,6 @@ class Layer:
             if layerParam.iMasstab == iMasstab:
                 return layerParam
         raise Exception(f"Layer mit Masstab {iMasstab} existiert nicht.")
-
-    def verifyInput(self, fUSwissgrid_, fVSwissgrid_):
-        def verifyDatatype(pt):
-            assert isinstance(pt[0], float)
-            assert isinstance(pt[1], float)
-
-        verifyDatatype(fUSwissgrid_)
-        verifyDatatype(fVSwissgrid_)
-        projections.assertOrientation((fUSwissgrid_, fVSwissgrid_))
-
-        # Referenzpunkte R und S ordnen: R ist 'oben links', S ist 'unten rechts'
-        # untenLinks = min_(fUSwissgrid_, fVSwissgrid_)
-        # obenRechts = max_(fUSwissgrid_, fVSwissgrid_)
-        # fASwissgrid = untenLinks[0], obenRechts[1]
-        # fBSwissgrid = obenRechts[0], untenLinks[1]
-
-        # return fASwissgrid, fBSwissgrid
 
     def is_white_data(self, image_data):
         try:
@@ -254,11 +235,7 @@ class Layer:
         return fOut.getvalue()
 
     def create(self):  # pylint: disable=too-many-statements,too-many-branches
-        fTlWGS84 = projections.CH1903_to_WGS84(self.fASwissgrid)
-        fBrWGS84 = projections.CH1903_to_WGS84(self.fBSwissgrid)
-        fBlWGS84 = projections.CH1903_to_WGS84((self.fASwissgrid[LON], self.fBSwissgrid[LAT]))
-        fTrWGS84 = projections.CH1903_to_WGS84((self.fBSwissgrid[LON], self.fASwissgrid[LAT]))
-        projections.assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
+        boundsWGS84 = self.boundsCH1903.to_WGS84()
 
         #
         # Die Tiles fuer die Karte zusammenkopieren
@@ -298,8 +275,6 @@ class Layer:
             f = (self.objOrux.strMapFolder / f"{self.objOrux.strMapName} {self.objLayerParams.iBaseLayer - iLAYER_OFFSET}.otrk2.xml").open("w")
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
 
-        projections.assertWGS84IsNorthWest(fTlWGS84, fBrWGS84)
-
         f.write(
             strTemplateLayerBegin.format(
                 iTILE_SIZE=iTILE_SIZE,
@@ -309,19 +284,19 @@ class Layer:
                 yMax=yCount,
                 height=yCount * iTILE_SIZE,
                 width=xCount * iTILE_SIZE,
-                minLat=fBrWGS84[LAT],
-                maxLat=fTlWGS84[LAT],
-                minLon=fTlWGS84[LON],
-                maxLon=fBrWGS84[LON],
+                minLat=boundsWGS84.bottomRight.lat,
+                maxLat=boundsWGS84.topLeft.lat,
+                minLon=boundsWGS84.topLeft.lon,
+                maxLon=boundsWGS84.bottomRight.lon,
             )
         )
-        for strPoint, fLon, fLat in (
-            ("TL", fTlWGS84[LON], fTlWGS84[LAT]),
-            ("BR", fBrWGS84[LON], fBrWGS84[LAT]),
-            ("TR", fTrWGS84[LON], fTrWGS84[LAT]),
-            ("BL", fBlWGS84[LON], fBlWGS84[LAT]),
+        for strPoint, lon, lat in (
+            ("TL", boundsWGS84.topLeft.lon, boundsWGS84.topLeft.lat),
+            ("BR", boundsWGS84.bottomRight.lon, boundsWGS84.bottomRight.lat),
+            ("TR", boundsWGS84.topRight.lon, boundsWGS84.topRight.lat),
+            ("BL", boundsWGS84.bottomLeft.lon, boundsWGS84.bottomLeft.lat),
         ):
-            f.write(f'          <CalibrationPoint corner="{strPoint}" lon="{fLon:2.6f}" lat="{fLat:2.6f}" />\n')
+            f.write(f'          <CalibrationPoint corner="{strPoint}" lon="{lon:2.6f}" lat="{lat:2.6f}" />\n')
 
         f.write(strTemplateLayerEnd)
         if not self.objOrux.bSqlite:
