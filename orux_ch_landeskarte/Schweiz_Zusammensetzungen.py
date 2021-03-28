@@ -40,13 +40,13 @@ for fSwissgridKarte, oruxmap, strKarteName in listZusammensetzungen:
         # Für grosse Masstäbe: ...
         if False:
             # ... die gesamte Schweiz
-            oruxmap.createLayer(iLayer, fSwissgridSchweiz)
+            oruxmap.createLayer(None, iLayer, fSwissgridSchweiz)
         else:
             # ... das entsprechende Gebiet
-            oruxmap.createLayer(iLayer, fSwissgridKarte)
+            oruxmap.createLayer(None, iLayer, fSwissgridKarte)
 
     for iLayer in (100000, 50000, 25000):
         # Kleinere Masstäge: Nur noch das entsprechende Gebiet
-        oruxmap.createLayer(iLayer, fSwissgridKarte)
+        oruxmap.createLayer(None, iLayer, fSwissgridKarte)
 
     oruxmap.done()

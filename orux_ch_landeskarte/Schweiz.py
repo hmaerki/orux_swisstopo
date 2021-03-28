@@ -32,6 +32,6 @@ for strTopFolder, strKartenName, listLayer in (
     oruxmap = programm.OruxMap("CH_%s" % strKartenName, strTopFolder=strTopFolder, bSqlite=True, bCopyReferenceTiles=True)
 
     for iLayer in listLayer:
-        oruxmap.createLayer(iLayer, fSwissgridKarte)
+        oruxmap.createLayer(None, iLayer, fSwissgridKarte)
 
     oruxmap.done()

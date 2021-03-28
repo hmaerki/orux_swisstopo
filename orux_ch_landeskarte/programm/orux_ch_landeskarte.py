@@ -49,6 +49,8 @@ import collections
 from dataclasses import dataclass
 from typing import List
 
+import geotiff
+
 fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 LON = 0
 LAT = 1
@@ -202,7 +204,7 @@ strTemplateMainEnd = """  </MapCalibration>
 </OruxTracker>"""
 
 # Wir unterstützen im Moment nur eine Tile-Grösse:
-iTILE_SIZE = 256
+iTILE_SIZE = 400
 
 # Der Layer 22 der Landestopographie entspricht Layer 15 in 'Mobile Atlase Creator'.
 # Der Unterschied ist also:
@@ -361,11 +363,11 @@ class OruxMap:
         fRSwissgrid = add(fTargetCenterSwissgrid, (-fTargetSizeM, fTargetSizeM))
         fSSwissgrid = add(fTargetCenterSwissgrid, (fTargetSizeM, -fTargetSizeM))
         assertSwissgridIsNorthWest(fRSwissgrid, fSSwissgrid)
-        self.createLayer(iMasstab, (fRSwissgrid, fSSwissgrid))
+        self.createLayer(None, iMasstab, (fRSwissgrid, fSSwissgrid))
 
-    def createLayer(self, iMasstab, l):
+    def createLayer(self, img, iMasstab, l):
         (fRSwissgrid, fSSwissgrid) = l
-        objLayer = Layer(self, iMasstab, fRSwissgrid, fSSwissgrid)
+        objLayer = Layer(self, img, iMasstab, fRSwissgrid, fSSwissgrid)
         objLayer.create()
 
     def done(self):
@@ -384,8 +386,11 @@ class OruxMap:
 
 
 class Layer:
-    def __init__(self, objOrux, iMasstab, fRSwissgrid, fSSwissgrid):
+    def __init__(self, objOrux, img, iMasstab, fRSwissgrid, fSSwissgrid):  # pylint: disable=too-many-arguments
+        # TODO
+        assert img is not None
         self.objOrux = objOrux
+        self.img = img
         self.iMasstab = iMasstab
         self.fRSwissgrid, self.fSSwissgrid = self.verifyInput(fRSwissgrid, fSSwissgrid)
         assertSwissgridIsNorthWest(self.fRSwissgrid, self.fSSwissgrid)
@@ -464,6 +469,13 @@ class Layer:
         del imTile
         return white
 
+    def extractTile(self, x, y):
+        im_crop = self.img.crop((x * iTILE_SIZE, y * iTILE_SIZE, (x + 1) * iTILE_SIZE, (y + 1) * iTILE_SIZE))
+        fOut = io.BytesIO()
+        geotiff.save_purge_palette(fOut, im_crop)
+        return fOut.getvalue()
+
+    # TODO: Remove
     def getTileFromCache(self, iTileX, iTileY):
         # strUrl = 'http://wmts4.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/20130213/21781/%d/%d/%d.jpeg' % (self.objLayerParams.iBaseLayer, iTileX, iTileY)
         #           http://wmts4.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/20130213/21781/22/261/373.jpeg
@@ -582,6 +594,16 @@ class Layer:
         xCount, yCount = len(listRangeX), len(listRangeY)
         iCountTilesAll = xCount * yCount
         iCountTile = 0
+
+        # listRangeX = range(iTlBaseTiles[0], iBrBaseTiles[0])
+        # listRangeY = range(iTlBaseTiles[1], iBrBaseTiles[1])
+        # xCount, yCount = len(listRangeX), len(listRangeY)
+        # iCountTilesAll = xCount * yCount
+        # iCountTile = 0
+        xCount = self.img.width // iTILE_SIZE
+        yCount = self.img.height // iTILE_SIZE
+        xCount = 2
+        yCount = 2
 
         print(f"----- Layer {self.objLayerParams.iBaseLayer}, Masstab 1:{self.objLayerParams.iMasstab}, {xCount}*{yCount}={xCount*yCount} Tiles")
 
