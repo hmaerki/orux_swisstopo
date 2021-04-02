@@ -52,6 +52,13 @@
       "request": "launch",
       "program": "${workspaceFolder}/TestGeoTIFF.py",
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: schweiz.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/schweiz.py",
+      "console": "integratedTerminal"
     }
   ]
 }

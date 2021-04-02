@@ -29,6 +29,7 @@ disable=
         C0302, # too-many-lines
         C0325, # Unnecessary parens after 'not' keyword (superfluous-parens)
         C0326, # bad-whitespace
+        C0330, # bad-continuation
         C0415, # import-outside-toplevel
         C1801, # len-as-condition
         # E0611, # no-name-in-module

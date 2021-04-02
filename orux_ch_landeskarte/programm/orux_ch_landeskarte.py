@@ -32,65 +32,89 @@ http://de.wikipedia.org/wiki/WGS_84
 http://www.ahnungslos.ch/android-screenshots-in-5-schritten/
   Android Screen Capture
 """
-import os
 import io
-import math
 import time
 import shutil
 import pathlib
 import sqlite3
-import collections
 from dataclasses import dataclass
-from typing import List
 
-import geotiff
+import requests
+import PIL.Image
+import rasterio
 
 from programm import projection
-from programm.projection import LON, LAT, CH1903, BoundsCH1903
+from programm.projection import CH1903, BoundsCH1903
+from programm.context import Context
 
 fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
+
+
+strFOLDER_ORUX_CH_LANDESKARTE = pathlib.Path(__file__).absolute().parent.parent
+strFOLDER_BASE = strFOLDER_ORUX_CH_LANDESKARTE.parent
+strFOLDER_CACHE = strFOLDER_BASE / "orux_ch_landeskarte_cache"
+strFOLDER_MAPS = strFOLDER_BASE / "orux_ch_landeskarte_maps"
+strFOLDER_RESOURCES = strFOLDER_ORUX_CH_LANDESKARTE / "resources"
+
+strFOLDER_CACHE.mkdir(exist_ok=True)
+strFOLDER_MAPS.mkdir(exist_ok=True)
+assert strFOLDER_MAPS.exists()
+
+PIL.Image.MAX_IMAGE_PIXELS = None
+
 
 @dataclass
 class LayerParams:
     iMasstab: int
     iBaseLayer: int
+    strTiffFilename: str = None
+
+    @property
+    def name(self):
+        return f"{self.iMasstab:04d}"
+
+    @property
+    def folder_resources(self):
+        return strFOLDER_RESOURCES / self.name
+
+    @property
+    def folder_cache(self):
+        return strFOLDER_CACHE / self.name
+
+    @property
+    def filename_url_tiffs(self):
+        return self.folder_resources / "url_tiffs.txt"
 
 
 listLayers = (
+    # LayerParams(
+    #     iMasstab=5000,
+    #     iBaseLayer=15,
+    # ),
+    # LayerParams(
+    #     iMasstab=2000,
+    #     iBaseLayer=16,
+    # ),
+    LayerParams(iMasstab=1000, iBaseLayer=17, strTiffFilename="SMR1000_KREL.tif"),
+    LayerParams(iMasstab=500, iBaseLayer=18, strTiffFilename="SMR500_KREL.tif"),
     LayerParams(
-        iMasstab=5000000,
-        iBaseLayer=15,
-    ),
-    LayerParams(
-        iMasstab=2000000,
-        iBaseLayer=16,
-    ),
-    LayerParams(
-        iMasstab=1000000,
-        iBaseLayer=17,
-    ),
-    LayerParams(
-        iMasstab=500000,
-        iBaseLayer=18,
-    ),
-    LayerParams(
-        iMasstab=200000,
+        iMasstab=200,
         iBaseLayer=19,
     ),
     LayerParams(
-        iMasstab=100000,
+        iMasstab=100,
         iBaseLayer=20,
     ),
     LayerParams(
-        iMasstab=50000,
+        iMasstab=50,
         iBaseLayer=21,
     ),
     LayerParams(
-        iMasstab=25000,
+        iMasstab=25,
         iBaseLayer=22,
     ),
     LayerParams(
-        iMasstab=10000,
+        iMasstab=10,
         iBaseLayer=25,
     ),
 )
@@ -126,25 +150,13 @@ iTILE_SIZE = 400
 # Der Unterschied ist also:
 iLAYER_OFFSET = 7
 
-strFOLDER_ORUX_CH_LANDESKARTE = pathlib.Path(__file__).absolute().parent
-strFOLDER_CACHE = strFOLDER_ORUX_CH_LANDESKARTE / "../../orux_ch_landeskarte_cache"
-strFOLDER_MAPS = strFOLDER_ORUX_CH_LANDESKARTE / "../../orux_ch_landeskarte_maps"
-strFOLDER_REFERENCE_TILES = strFOLDER_ORUX_CH_LANDESKARTE / "reference_tiles"
-strFOLDER_CACHE_TILES = strFOLDER_CACHE / "tiles"
-
-
 
 class OruxMap:
-    def __init__(self, strMapName, bSqlite=True, bCopyReferenceTiles=False, strTopFolder=strFOLDER_ORUX_CH_LANDESKARTE):
-        assert isinstance(strTopFolder, pathlib.Path)
-        if strMapName.endswith(".py"):
-            # Es wurde der Parameter __file__ uebergeben, strMapName sieht also etwa so aus: C:\data\...\Hombrechtikon.py
-            strMapName = os.path.basename(strMapName).replace(".py", "")
+    def __init__(self, strMapName, context):
+        assert isinstance(context, Context)
         self.strMapName = strMapName
-        self.bCopyReferenceTiles = bCopyReferenceTiles
-        self.strTopFolder = strTopFolder
+        self.context = context
         self.strMapFolder = strFOLDER_MAPS / strMapName
-        self.bSqlite = bSqlite
 
         print("===== ", self.strMapName)
 
@@ -153,61 +165,106 @@ class OruxMap:
             time.sleep(1.0)
         self.strMapFolder.mkdir(parents=True, exist_ok=True)
 
-        if self.bCopyReferenceTiles:
-            if (strTopFolder / strFOLDER_REFERENCE_TILES).exists():
-                shutil.rmtree(strTopFolder / strFOLDER_REFERENCE_TILES)
-                time.sleep(1.0)
-            (strTopFolder / strFOLDER_REFERENCE_TILES).mkdir(parents=True, exist_ok=True)
-
-        if self.bSqlite:
-            strFilenameSqlite = self.strMapFolder / "OruxMapsImages.db"
-            if strFilenameSqlite.exists():
-                strFilenameSqlite.unlink()
-            self.db = sqlite3.connect(strFilenameSqlite)
-            self.db.execute("""CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))""")
-            self.db.execute("""CREATE TABLE android_metadata (locale TEXT)""")
-            self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
+        strFilenameSqlite = self.strMapFolder / "OruxMapsImages.db"
+        if strFilenameSqlite.exists():
+            strFilenameSqlite.unlink()
+        self.db = sqlite3.connect(strFilenameSqlite)
+        self.db.execute("""CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))""")
+        self.db.execute("""CREATE TABLE android_metadata (locale TEXT)""")
+        self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
 
         self.fXml = (self.strMapFolder / f"{strMapName}.otrk2.xml").open("w")
         self.fXml.write(strTemplateMainStart.format(strMapName=strMapName))
 
-    def createLayer(self, img, iMasstab, boundsCH1903: BoundsCH1903):
-        assert isinstance(boundsCH1903, BoundsCH1903)
-        objLayer = Layer(self, img, iMasstab, boundsCH1903)
-        objLayer.create()
+    def createLayers(self, iMasstabMin: int = 25, iMasstabMax: int = 500):
+        for layerParam in listLayers:
+            if iMasstabMin <= layerParam.iMasstab <= iMasstabMax:
+                self.createLayer(layerParam=layerParam)
+
+    def createLayer(self, layerParam):
+        objLayer2 = Layer2(self, layerParam)
+        objLayer2.downloadTiffs()
+        objLayer2.createMap()
+
+    # def createLayer_(self, img, iMasstab, boundsCH1903: BoundsCH1903):
+    #     assert isinstance(boundsCH1903, BoundsCH1903)
+    #     objLayer = Layer(self, img, iMasstab, boundsCH1903)
+    #     objLayer.create()
 
     def done(self):
         self.fXml.write(strTemplateMainEnd)
         self.fXml.close()
 
-        if self.bSqlite:
-            self.db.commit()
-            self.db.close()
+        self.db.commit()
+        self.db.close()
         print("----- Fertig")
-        if self.bCopyReferenceTiles:
-            print(f'bCopyReferenceTiles ist eingeschaltet: Die Referenztiles liegen im Ordner "{strFOLDER_REFERENCE_TILES}". Beachte das rote Kreuz!')
         print(f'Die Karte liegt nun bereit im Ordner "{self.strMapName}".')
         print("Dieser Ordner muss jetzt 'von Hand' in den Ordner \"oruxmaps\\mapfiles\" kopiert werden.")
         # sys.stdin.readline()
 
 
+class Layer2:
+    def __init__(self, oruxMaps, layerParam):
+        self.oruxMaps = oruxMaps
+        self.layerParam = layerParam
+        assert self.layerParam.folder_resources.exists()
+
+    @property
+    def _tiffs(self):
+        if self.layerParam.strTiffFilename:
+            # For big scales, the image is stored in git
+            yield self.layerParam.folder_resources / self.layerParam.strTiffFilename
+            return
+
+        filename_url_tiffs = self.layerParam.folder_resources / "url_tiffs.txt"
+        yield from self._download_tiffs(filename_url_tiffs)
+
+    def _download_tiffs(self, filename_url_tiffs):
+        assert filename_url_tiffs.exists()
+        self.layerParam.folder_cache.mkdir(exist_ok=True)
+        with self.layerParam.filename_url_tiffs.open("r") as f:
+            for url in sorted(f.readlines()):
+                url = url.strip()
+                name = url.split("/")[-1]
+                filename = self.layerParam.folder_cache / name
+                if self.oruxMaps.context.only_tiffs is not None:
+                    if filename.name not in self.oruxMaps.context.only_tiffs:
+                        continue
+                if not filename.exists():
+                    print(f"Downloading {filename.relative_to(strFOLDER_BASE)}")
+                    r = requests.get(url)
+                    filename.write_bytes(r.content)
+                yield filename
+
+    def downloadTiffs(self):
+        for filename in self._tiffs:
+            pass
+
+    def createMap(self):
+        tiffs = list(self._tiffs)
+        for i, filename in enumerate(tiffs):
+            with rasterio.open(filename, "r") as dataset:
+                if dataset.crs is None:
+                    print(f"WARNING: No position found in {filename.relative_to(strFOLDER_ORUX_CH_LANDESKARTE)}")
+                    continue
+                boundsCH1903 = BoundsCH1903(CH1903(dataset.bounds.left, dataset.bounds.top), CH1903(dataset.bounds.right, dataset.bounds.bottom))
+                with PIL.Image.open(filename) as img:
+                    strLabel = f"{filename.relative_to(strFOLDER_BASE)} {i}({len(tiffs)})"
+                    objLayer = Layer(objOrux=self.oruxMaps, strLabel=strLabel, img=img, iMasstab=self.layerParam.iMasstab, boundsCH1903=boundsCH1903)
+                    objLayer.create()
+
+
 class Layer:
-    def __init__(self, objOrux, img, iMasstab, boundsCH1903: BoundsCH1903):  # pylint: disable=too-many-arguments
+    def __init__(self, objOrux, img, strLabel, iMasstab, boundsCH1903: BoundsCH1903):  # pylint: disable=too-many-arguments
         # TODO
         assert img is not None
         self.objOrux = objOrux
         self.img = img
         self.iMasstab = iMasstab
+        self.strLabel = strLabel
         projection.assertSwissgridIsNorthWest(boundsCH1903)
         self.boundsCH1903 = boundsCH1903
         self.objLayerParams: LayerParams = self.findLayer(iMasstab)
-        self.strFolderCacheTiles = strFOLDER_CACHE_TILES / f"{self.objLayerParams.iBaseLayer}"
-        if not self.strFolderCacheTiles.exists():
-            self.strFolderCacheTiles.mkdir(parents=True, exist_ok=True)
-
-        listFiles = os.listdir(self.strFolderCacheTiles)
-        listFiles = filter(lambda filename: filename.endswith(".jpg"), listFiles)
-        self.setTilesFiles = set(listFiles)
 
     def findLayer(self, iMasstab) -> LayerParams:
         for layerParam in listLayers:
@@ -216,10 +273,6 @@ class Layer:
         raise Exception(f"Layer mit Masstab {iMasstab} existiert nicht.")
 
     def is_white_data(self, image_data):
-        try:
-            import PIL.Image
-        except ModuleNotFoundError:
-            return False
         if len(image_data) > 1000:
             return False
         imTile = PIL.Image.open(io.BytesIO(image_data))
@@ -228,10 +281,35 @@ class Layer:
         del imTile
         return white
 
+    def _save_purge_palette(self, fOut, img):
+        if self.objOrux.context.skip_optimize_png:
+            img.save(fOut, format="PNG")
+            return
+
+        img = img.convert("RGB")
+
+        # TODO: Go through the color palette and prune similar colors
+        threshold = 10
+        data = list(img.getdata())
+        for i, v in enumerate(data):
+            if sum(v) < threshold:
+                data[i] = (0, 0, 0)
+        img.putdata(data)
+
+        img = img.convert("P", palette=PIL.Image.ADAPTIVE)
+        # Now the palette is reordered: At the beginning are used colors
+        colors = -1
+        for v in img.histogram():
+            if v > 0:
+                colors += 1
+        bits = colors.bit_length()
+        # Only store the part of the palette which is used
+        img.save(fOut, format="PNG", optimize=True, compress_level=9, bits=bits)
+
     def extractTile(self, x, y):
         im_crop = self.img.crop((x * iTILE_SIZE, y * iTILE_SIZE, (x + 1) * iTILE_SIZE, (y + 1) * iTILE_SIZE))
         fOut = io.BytesIO()
-        geotiff.save_purge_palette(fOut, im_crop)
+        self._save_purge_palette(fOut, im_crop)
         return fOut.getvalue()
 
     def create(self):  # pylint: disable=too-many-statements,too-many-branches
@@ -240,40 +318,27 @@ class Layer:
         #
         # Die Tiles fuer die Karte zusammenkopieren
         #
-        if not self.objOrux.bSqlite:
-            strFolder = self.objOrux.strTopFolder / self.objOrux.strMapName / f"{self.objOrux.strMapName}_{self.objLayerParams.iBaseLayer - iLAYER_OFFSET}"
-            if not strFolder.exists():
-                strFolder.mkdir(xy=True)
-            if not (strFolder / "set").exists():
-                (strFolder / "set").mkdir(parents=True, exist_ok=True)
-
         xCount = self.img.width // iTILE_SIZE
         yCount = self.img.height // iTILE_SIZE
+        total = self.objOrux.context.skip_count(xCount) * self.objOrux.context.skip_count(yCount)
+        start_s = time.perf_counter()
+        size = 0
+        count = 0
         for y in range(yCount):
-            for x in range(xCount):
-                # TODO: Remove
+            if self.objOrux.context.skip_border(i=y, count=yCount):
                 continue
-                if self.objOrux.bSqlite:
-                    rawImagedata = self.extractTile(x, y)
-                    b = sqlite3.Binary(rawImagedata)
-                    self.objOrux.db.execute("insert or replace into tiles values (?,?,?,?)", (x, y, self.objLayerParams.iBaseLayer - iLAYER_OFFSET, b))
-                else:
-                    try:
-                        strFilenameTileFull = self.strFolderCacheTiles / strFilenameTile
-                        strFilename2 = f"{self.objOrux.strMapName}_{self.objLayerParams.iBaseLayer - iLAYER_OFFSET}_{x}_{yCount - y - 1}.omc2"
-                        strFilename2Full = self.objOrux.strTopFolder / ".." / strFolder / "set" / strFilename2
-                        shutil.copyfile(strFilenameTileFull, strFilename2Full)
-                        with strFilenameTileFull.open("rb") as fIn:
-                            fOut = io.BytesIO()
-                    except IOError as e:
-                        shutil.copyfile(strFOLDER_ORUX_CH_LANDESKARTE / "not_found.jpg", strFilename2Full)
-                        print("Error:", e)
+            for x in range(xCount):
+                if self.objOrux.context.skip_border(i=x, count=xCount):
+                    continue
+                rawImagedata = self.extractTile(x, y)
+                size += len(rawImagedata)
+                b = sqlite3.Binary(rawImagedata)
+                self.objOrux.db.execute("insert or replace into tiles values (?,?,?,?)", (x, y, self.objLayerParams.iBaseLayer - iLAYER_OFFSET, b))
+                count += 1
+            ms_per_tile = 1000.0 * (time.perf_counter() - start_s) / count
+            print(f"{self.strLabel}. Image {count}({total}). Per tile: {ms_per_tile:0.0f}ms {size/count/1000:0.1f}kbytes")
 
-        if self.objOrux.bSqlite:
-            f = self.objOrux.fXml
-        else:
-            f = (self.objOrux.strMapFolder / f"{self.objOrux.strMapName} {self.objLayerParams.iBaseLayer - iLAYER_OFFSET}.otrk2.xml").open("w")
-            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        f = self.objOrux.fXml
 
         f.write(
             strTemplateLayerBegin.format(
@@ -284,47 +349,45 @@ class Layer:
                 yMax=yCount,
                 height=yCount * iTILE_SIZE,
                 width=xCount * iTILE_SIZE,
-                minLat=boundsWGS84.bottomRight.lat,
-                maxLat=boundsWGS84.topLeft.lat,
-                minLon=boundsWGS84.topLeft.lon,
-                maxLon=boundsWGS84.bottomRight.lon,
+                minLat=boundsWGS84.southEast.lat,
+                maxLat=boundsWGS84.northWest.lat,
+                minLon=boundsWGS84.northWest.lon,
+                maxLon=boundsWGS84.southEast.lon,
             )
         )
         for strPoint, lon, lat in (
-            ("TL", boundsWGS84.topLeft.lon, boundsWGS84.topLeft.lat),
-            ("BR", boundsWGS84.bottomRight.lon, boundsWGS84.bottomRight.lat),
-            ("TR", boundsWGS84.topRight.lon, boundsWGS84.topRight.lat),
-            ("BL", boundsWGS84.bottomLeft.lon, boundsWGS84.bottomLeft.lat),
+            ("TL", boundsWGS84.northWest.lon, boundsWGS84.northWest.lat),
+            ("BR", boundsWGS84.southEast.lon, boundsWGS84.southEast.lat),
+            ("TR", boundsWGS84.northEast.lon, boundsWGS84.northEast.lat),
+            ("BL", boundsWGS84.southWest.lon, boundsWGS84.southWest.lat),
         ):
             f.write(f'          <CalibrationPoint corner="{strPoint}" lon="{lon:2.6f}" lat="{lat:2.6f}" />\n')
 
         f.write(strTemplateLayerEnd)
-        if not self.objOrux.bSqlite:
-            f.close()
 
 
-if False:
-    oruxmap = OruxMap("Hombrechtikon")
-    for iBaseLayer in (22,):
-        oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
+# if False:
+#     oruxmap = OruxMap("Hombrechtikon")
+#     for iBaseLayer in (22,):
+#         oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
 
-if False:
-    oruxmap = OruxMap("Hombrechtikon")
-    for iBaseLayer in (17, 18, 19):
-        oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 10000.0)
-    for iBaseLayer in (20, 21, 22):
-        oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
+# if False:
+#     oruxmap = OruxMap("Hombrechtikon")
+#     for iBaseLayer in (17, 18, 19):
+#         oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 10000.0)
+#     for iBaseLayer in (20, 21, 22):
+#         oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
 
-if False:
-    oruxmap = OruxMap("RefBl")
-    for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
-        oruxmap.createLayerPlusMinus(iBaseLayer, (481000.0, 110000.0), 2000.0)
+# if False:
+#     oruxmap = OruxMap("RefBl")
+#     for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
+#         oruxmap.createLayerPlusMinus(iBaseLayer, (481000.0, 110000.0), 2000.0)
 
-    oruxmap = OruxMap("RefTr")
-    for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
-        oruxmap.createLayerPlusMinus(iBaseLayer, (776000.0, 276000.0), 2000.0)
+#     oruxmap = OruxMap("RefTr")
+#     for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
+#         oruxmap.createLayerPlusMinus(iBaseLayer, (776000.0, 276000.0), 2000.0)
 
-if False:
-    oruxmap = OruxMap("RefLuetzel")
-    for iBaseLayer in (16,):
-        oruxmap.createLayerPlusMinus(iBaseLayer, (700000.0, 236000.0), 2000.0)
+# if False:
+#     oruxmap = OruxMap("RefLuetzel")
+#     for iBaseLayer in (16,):
+#         oruxmap.createLayerPlusMinus(iBaseLayer, (700000.0, 236000.0), 2000.0)

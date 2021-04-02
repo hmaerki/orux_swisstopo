@@ -1,2 +1,4 @@
+rasterio>=1.2.1
 pylint>=2.7.2
-black>=20.7
+black>=20
+pillow>=8.1.2

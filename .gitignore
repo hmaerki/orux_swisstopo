@@ -1,5 +1,6 @@
-orux_ch_landeskarte_cache
-ZuercherOberland
+orux_ch_landeskarte/resources
+orux_ch_landeskarte_cache/
+orux_ch_landeskarte_maps/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
