@@ -24,27 +24,7 @@ fSwissgridKarte = (480000.0, 70000.0), (840000.0, 300000.0)
 
 context = Context()
 # context.skip_optimize_png = False
-# context.only_tiffs = ('swiss-map-raster200_2019_2002_krel_10_2056.tif', )
+context.only_tiffs = ("swiss-map-raster200_2019_2002_krel_10_2056.tif",)
 context.only_tiles_border = 5
-oruxmap = programm.OruxMap(f"CH_Schweiz", context=context)
-
-oruxmap.createLayers(iMasstabMin=200, iMasstabMax=1000)
-
-oruxmap.done()
-
-# for strTopFolder, strKartenName, listLayer in (
-#         # 1.9 GByte
-#         ("Schweiz_4GByte", "25000_only", (25000,)),
-#         # 4.0 GByte
-#         ("Schweiz_4GByte", "50000_and_up", (5000000, 2000000, 1000000, 500000, 200000, 100000, 50000)),
-#         # 5.9 GByte
-#         ("Schweiz", "25000", (5000000, 2000000, 1000000, 500000, 200000, 100000, 50000, 25000)),
-#     ):
-#     context = Context()
-#     oruxmap = programm.OruxMap(f"CH_{strKartenName}", context=context)
-
-#     # for iMasstab in listLayer:
-#     #     oruxmap.createLayer(None, iMasstab, fSwissgridKarte)
-#     oruxmap.createLayers(iMasstabMin= 100000, iMasstabMax = 1000000)
-
-#     oruxmap.done()
+with programm.OruxMap(f"CH_Schweiz", context=context) as oruxmap:
+    oruxmap.createLayers(iMasstabMin=200, iMasstabMax=1000)

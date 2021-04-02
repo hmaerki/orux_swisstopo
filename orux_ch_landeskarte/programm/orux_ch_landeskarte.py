@@ -50,122 +50,122 @@ from programm.context import Context
 fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 
 
-strFOLDER_ORUX_CH_LANDESKARTE = pathlib.Path(__file__).absolute().parent.parent
-strFOLDER_BASE = strFOLDER_ORUX_CH_LANDESKARTE.parent
-strFOLDER_CACHE = strFOLDER_BASE / "orux_ch_landeskarte_cache"
-strFOLDER_MAPS = strFOLDER_BASE / "orux_ch_landeskarte_maps"
-strFOLDER_RESOURCES = strFOLDER_ORUX_CH_LANDESKARTE / "resources"
+DIRECTORY_ORUX_CH_LANDESKARTE = pathlib.Path(__file__).absolute().parent.parent
+DIRECTORY_BASE = DIRECTORY_ORUX_CH_LANDESKARTE.parent
+DIRECTORY_CACHE = DIRECTORY_BASE / "orux_ch_landeskarte_cache"
+DIRECTORY_MAPS = DIRECTORY_BASE / "orux_ch_landeskarte_maps"
+DIRECTORY_RESOURCES = DIRECTORY_ORUX_CH_LANDESKARTE / "resources"
 
-strFOLDER_CACHE.mkdir(exist_ok=True)
-strFOLDER_MAPS.mkdir(exist_ok=True)
-assert strFOLDER_MAPS.exists()
+DIRECTORY_CACHE.mkdir(exist_ok=True)
+DIRECTORY_MAPS.mkdir(exist_ok=True)
+assert DIRECTORY_MAPS.exists()
 
 PIL.Image.MAX_IMAGE_PIXELS = None
 
 
 @dataclass
 class LayerParams:
-    iMasstab: int
+    scale: int
     iBaseLayer: int
     strTiffFilename: str = None
 
     @property
     def name(self):
-        return f"{self.iMasstab:04d}"
+        return f"{self.scale:04d}"
 
     @property
     def folder_resources(self):
-        return strFOLDER_RESOURCES / self.name
+        return DIRECTORY_RESOURCES / self.name
 
     @property
     def folder_cache(self):
-        return strFOLDER_CACHE / self.name
+        return DIRECTORY_CACHE / self.name
 
     @property
     def filename_url_tiffs(self):
         return self.folder_resources / "url_tiffs.txt"
 
 
-listLayers = (
+LIST_LAYERS = (
     # LayerParams(
-    #     iMasstab=5000,
+    #     scale=5000,
     #     iBaseLayer=15,
     # ),
     # LayerParams(
-    #     iMasstab=2000,
+    #     scale=2000,
     #     iBaseLayer=16,
     # ),
-    LayerParams(iMasstab=1000, iBaseLayer=17, strTiffFilename="SMR1000_KREL.tif"),
-    LayerParams(iMasstab=500, iBaseLayer=18, strTiffFilename="SMR500_KREL.tif"),
+    LayerParams(scale=1000, iBaseLayer=17, strTiffFilename="SMR1000_KREL.tif"),
+    LayerParams(scale=500, iBaseLayer=18, strTiffFilename="SMR500_KREL.tif"),
     LayerParams(
-        iMasstab=200,
+        scale=200,
         iBaseLayer=19,
     ),
     LayerParams(
-        iMasstab=100,
+        scale=100,
         iBaseLayer=20,
     ),
     LayerParams(
-        iMasstab=50,
+        scale=50,
         iBaseLayer=21,
     ),
     LayerParams(
-        iMasstab=25,
+        scale=25,
         iBaseLayer=22,
     ),
     LayerParams(
-        iMasstab=10,
+        scale=10,
         iBaseLayer=25,
     ),
 )
 
-strTemplateLayerBegin = """    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="2.1">
+TEMPLATE_LAYER_BEGIN = """    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="2.1">
       <MapCalibration layers="false" layerLevel="{id}">
-        <MapName><![CDATA[{strMapName} {id:d}]]></MapName>
-        <MapChunks xMax="{xMax}" yMax="{yMax}" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="{iTILE_SIZE}" img_width="{iTILE_SIZE}" file_name="{strMapName}" />
+        <MapName><![CDATA[{map_name} {id:d}]]></MapName>
+        <MapChunks xMax="{xMax}" yMax="{yMax}" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="{TILE_SIZE}" img_width="{TILE_SIZE}" file_name="{map_name}" />
         <MapDimensions height="{height}" width="{width}" />
         <MapBounds minLat="{minLat:2.6f}" maxLat="{maxLat:2.6f}" minLon="{minLon:2.6f}" maxLon="{maxLon:2.6f}" />
         <CalibrationPoints>
 """
 
-strTemplateLayerEnd = """        </CalibrationPoints>
+TEMPLATE_LAYER_END = """        </CalibrationPoints>
       </MapCalibration>
     </OruxTracker>
 """
 
 
-strTemplateMainStart = """<?xml version="1.0" encoding="UTF-8"?>
+TEMPLATE_MAIN_START = """<?xml version="1.0" encoding="UTF-8"?>
 <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="3.0">
   <MapCalibration layers="true" layerLevel="0">
-    <MapName><![CDATA[{strMapName}]]></MapName>
+    <MapName><![CDATA[{map_name}]]></MapName>
 """
 
-strTemplateMainEnd = """  </MapCalibration>
+TEMPLATE_MAIN_END = """  </MapCalibration>
 </OruxTracker>"""
 
 # Wir unterstützen im Moment nur eine Tile-Grösse:
-iTILE_SIZE = 400
+TILE_SIZE = 400
 
 # Der Layer 22 der Landestopographie entspricht Layer 15 in 'Mobile Atlase Creator'.
 # Der Unterschied ist also:
-iLAYER_OFFSET = 7
+LAYER_OFFSET = 7
 
 
 class OruxMap:
-    def __init__(self, strMapName, context):
+    def __init__(self, map_name, context):
         assert isinstance(context, Context)
-        self.strMapName = strMapName
+        self.map_name = map_name
         self.context = context
-        self.strMapFolder = strFOLDER_MAPS / strMapName
+        self.directory_map = DIRECTORY_MAPS / map_name
 
-        print("===== ", self.strMapName)
+        print("===== ", self.map_name)
 
-        if self.strMapFolder.exists():
-            shutil.rmtree(self.strMapFolder)
+        if self.directory_map.exists():
+            shutil.rmtree(self.directory_map)
             time.sleep(1.0)
-        self.strMapFolder.mkdir(parents=True, exist_ok=True)
+        self.directory_map.mkdir(parents=True, exist_ok=True)
 
-        strFilenameSqlite = self.strMapFolder / "OruxMapsImages.db"
+        strFilenameSqlite = self.directory_map / "OruxMapsImages.db"
         if strFilenameSqlite.exists():
             strFilenameSqlite.unlink()
         self.db = sqlite3.connect(strFilenameSqlite)
@@ -173,37 +173,42 @@ class OruxMap:
         self.db.execute("""CREATE TABLE android_metadata (locale TEXT)""")
         self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
 
-        self.fXml = (self.strMapFolder / f"{strMapName}.otrk2.xml").open("w")
-        self.fXml.write(strTemplateMainStart.format(strMapName=strMapName))
+        self.fXml = (self.directory_map / f"{map_name}.otrk2.xml").open("w")
+        self.fXml.write(TEMPLATE_MAIN_START.format(map_name=map_name))
 
-    def createLayers(self, iMasstabMin: int = 25, iMasstabMax: int = 500):
-        for layerParam in listLayers:
-            if iMasstabMin <= layerParam.iMasstab <= iMasstabMax:
-                self.createLayer(layerParam=layerParam)
+    def __enter__(self):
+        return self
 
-    def createLayer(self, layerParam):
-        objLayer2 = Layer2(self, layerParam)
-        objLayer2.downloadTiffs()
-        objLayer2.createMap()
-
-    # def createLayer_(self, img, iMasstab, boundsCH1903: BoundsCH1903):
-    #     assert isinstance(boundsCH1903, BoundsCH1903)
-    #     objLayer = Layer(self, img, iMasstab, boundsCH1903)
-    #     objLayer.create()
-
-    def done(self):
-        self.fXml.write(strTemplateMainEnd)
+    def __exit__(self, _type, value, tb):
+        self.fXml.write(TEMPLATE_MAIN_END)
         self.fXml.close()
 
         self.db.commit()
         self.db.close()
         print("----- Fertig")
-        print(f'Die Karte liegt nun bereit im Ordner "{self.strMapName}".')
+        print(f'Die Karte liegt nun bereit im Ordner "{self.directory_map.relative_to(DIRECTORY_BASE)}".')
         print("Dieser Ordner muss jetzt 'von Hand' in den Ordner \"oruxmaps\\mapfiles\" kopiert werden.")
-        # sys.stdin.readline()
+
+    def createLayers(self, iMasstabMin: int = 25, iMasstabMax: int = 500):
+        for layerParam in LIST_LAYERS:
+            if iMasstabMin <= layerParam.scale <= iMasstabMax:
+                self.createLayer(layerParam=layerParam)
+
+    def createLayer(self, layerParam):
+        objLayer2 = MapScale(self, layerParam)
+        objLayer2.downloadTiffs()
+        objLayer2.createMap()
 
 
-class Layer2:
+class SkipException(Exception):
+    pass
+
+
+class MapScale:
+    """
+    This object represents one scale. For example 1:25'000, 1:50'000.
+    """
+
     def __init__(self, oruxMaps, layerParam):
         self.oruxMaps = oruxMaps
         self.layerParam = layerParam
@@ -231,7 +236,7 @@ class Layer2:
                     if filename.name not in self.oruxMaps.context.only_tiffs:
                         continue
                 if not filename.exists():
-                    print(f"Downloading {filename.relative_to(strFOLDER_BASE)}")
+                    print(f"Downloading {filename.relative_to(DIRECTORY_BASE)}")
                     r = requests.get(url)
                     filename.write_bytes(r.content)
                 yield filename
@@ -243,34 +248,28 @@ class Layer2:
     def createMap(self):
         tiffs = list(self._tiffs)
         for i, filename in enumerate(tiffs):
-            with rasterio.open(filename, "r") as dataset:
-                if dataset.crs is None:
-                    print(f"WARNING: No position found in {filename.relative_to(strFOLDER_ORUX_CH_LANDESKARTE)}")
-                    continue
-                boundsCH1903 = BoundsCH1903(CH1903(dataset.bounds.left, dataset.bounds.top), CH1903(dataset.bounds.right, dataset.bounds.bottom))
-                with PIL.Image.open(filename) as img:
-                    strLabel = f"{filename.relative_to(strFOLDER_BASE)} {i}({len(tiffs)})"
-                    objLayer = Layer(objOrux=self.oruxMaps, strLabel=strLabel, img=img, iMasstab=self.layerParam.iMasstab, boundsCH1903=boundsCH1903)
-                    objLayer.create()
+            try:
+                label = f"{filename.relative_to(DIRECTORY_BASE)} {i}({len(tiffs)})"
+                imageTiff = ImageTiff(objMapScale=self, filename=filename, label=label)
+            except SkipException:
+                continue
+            imageTiff.create()
 
 
-class Layer:
-    def __init__(self, objOrux, img, strLabel, iMasstab, boundsCH1903: BoundsCH1903):  # pylint: disable=too-many-arguments
-        # TODO
-        assert img is not None
-        self.objOrux = objOrux
-        self.img = img
-        self.iMasstab = iMasstab
-        self.strLabel = strLabel
+class ImageTiff:
+    def __init__(self, objMapScale, filename, label):
+        self.oruxMaps = objMapScale.oruxMaps
+        self.filename = filename
+        self.label = label
+        self.scale = objMapScale
+        self.context = self.oruxMaps.context
+        self.objLayerParams = objMapScale.layerParam
+        with rasterio.open(filename, "r") as dataset:
+            if dataset.crs is None:
+                raise SkipException(f"WARNING: No position found in {filename.relative_to(DIRECTORY_ORUX_CH_LANDESKARTE)}")
+            boundsCH1903 = BoundsCH1903(CH1903(dataset.bounds.left, dataset.bounds.top), CH1903(dataset.bounds.right, dataset.bounds.bottom))
         projection.assertSwissgridIsNorthWest(boundsCH1903)
         self.boundsCH1903 = boundsCH1903
-        self.objLayerParams: LayerParams = self.findLayer(iMasstab)
-
-    def findLayer(self, iMasstab) -> LayerParams:
-        for layerParam in listLayers:
-            if layerParam.iMasstab == iMasstab:
-                return layerParam
-        raise Exception(f"Layer mit Masstab {iMasstab} existiert nicht.")
 
     def is_white_data(self, image_data):
         if len(image_data) > 1000:
@@ -282,7 +281,7 @@ class Layer:
         return white
 
     def _save_purge_palette(self, fOut, img):
-        if self.objOrux.context.skip_optimize_png:
+        if self.context.skip_optimize_png:
             img.save(fOut, format="PNG")
             return
 
@@ -306,8 +305,8 @@ class Layer:
         # Only store the part of the palette which is used
         img.save(fOut, format="PNG", optimize=True, compress_level=9, bits=bits)
 
-    def extractTile(self, x, y):
-        im_crop = self.img.crop((x * iTILE_SIZE, y * iTILE_SIZE, (x + 1) * iTILE_SIZE, (y + 1) * iTILE_SIZE))
+    def extractTile(self, img, x, y):
+        im_crop = img.crop((x * TILE_SIZE, y * TILE_SIZE, (x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE))
         fOut = io.BytesIO()
         self._save_purge_palette(fOut, im_crop)
         return fOut.getvalue()
@@ -315,40 +314,41 @@ class Layer:
     def create(self):  # pylint: disable=too-many-statements,too-many-branches
         boundsWGS84 = self.boundsCH1903.to_WGS84()
 
-        #
-        # Die Tiles fuer die Karte zusammenkopieren
-        #
-        xCount = self.img.width // iTILE_SIZE
-        yCount = self.img.height // iTILE_SIZE
-        total = self.objOrux.context.skip_count(xCount) * self.objOrux.context.skip_count(yCount)
-        start_s = time.perf_counter()
-        size = 0
-        count = 0
-        for y in range(yCount):
-            if self.objOrux.context.skip_border(i=y, count=yCount):
-                continue
-            for x in range(xCount):
-                if self.objOrux.context.skip_border(i=x, count=xCount):
+        with PIL.Image.open(self.filename) as img:
+            #
+            # Die Tiles fuer die Karte zusammenkopieren
+            #
+            xCount = img.width // TILE_SIZE
+            yCount = img.height // TILE_SIZE
+            total = self.context.skip_count(xCount) * self.context.skip_count(yCount)
+            start_s = time.perf_counter()
+            size = 0
+            count = 0
+            for y in range(yCount):
+                if self.context.skip_border(i=y, count=yCount):
                     continue
-                rawImagedata = self.extractTile(x, y)
-                size += len(rawImagedata)
-                b = sqlite3.Binary(rawImagedata)
-                self.objOrux.db.execute("insert or replace into tiles values (?,?,?,?)", (x, y, self.objLayerParams.iBaseLayer - iLAYER_OFFSET, b))
-                count += 1
-            ms_per_tile = 1000.0 * (time.perf_counter() - start_s) / count
-            print(f"{self.strLabel}. Image {count}({total}). Per tile: {ms_per_tile:0.0f}ms {size/count/1000:0.1f}kbytes")
+                for x in range(xCount):
+                    if self.context.skip_border(i=x, count=xCount):
+                        continue
+                    rawImagedata = self.extractTile(img, x, y)
+                    size += len(rawImagedata)
+                    b = sqlite3.Binary(rawImagedata)
+                    self.oruxMaps.db.execute("insert or replace into tiles values (?,?,?,?)", (x, y, self.objLayerParams.iBaseLayer - LAYER_OFFSET, b))
+                    count += 1
+                ms_per_tile = 1000.0 * (time.perf_counter() - start_s) / count
+                print(f"{self.label}. Image {count}({total}). Per tile: {ms_per_tile:0.0f}ms {size/count/1000:0.1f}kbytes")
 
-        f = self.objOrux.fXml
+        f = self.oruxMaps.fXml
 
         f.write(
-            strTemplateLayerBegin.format(
-                iTILE_SIZE=iTILE_SIZE,
-                strMapName=self.objOrux.strMapName,
-                id=self.objLayerParams.iBaseLayer - iLAYER_OFFSET,
+            TEMPLATE_LAYER_BEGIN.format(
+                TILE_SIZE=TILE_SIZE,
+                map_name=self.oruxMaps.map_name,
+                id=self.objLayerParams.iBaseLayer - LAYER_OFFSET,
                 xMax=xCount,
                 yMax=yCount,
-                height=yCount * iTILE_SIZE,
-                width=xCount * iTILE_SIZE,
+                height=yCount * TILE_SIZE,
+                width=xCount * TILE_SIZE,
                 minLat=boundsWGS84.southEast.lat,
                 maxLat=boundsWGS84.northWest.lat,
                 minLon=boundsWGS84.northWest.lon,
@@ -363,31 +363,4 @@ class Layer:
         ):
             f.write(f'          <CalibrationPoint corner="{strPoint}" lon="{lon:2.6f}" lat="{lat:2.6f}" />\n')
 
-        f.write(strTemplateLayerEnd)
-
-
-# if False:
-#     oruxmap = OruxMap("Hombrechtikon")
-#     for iBaseLayer in (22,):
-#         oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
-
-# if False:
-#     oruxmap = OruxMap("Hombrechtikon")
-#     for iBaseLayer in (17, 18, 19):
-#         oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 10000.0)
-#     for iBaseLayer in (20, 21, 22):
-#         oruxmap.createLayerPlusMinus(iBaseLayer, (701000.0, 235000.0), 4000.0)
-
-# if False:
-#     oruxmap = OruxMap("RefBl")
-#     for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
-#         oruxmap.createLayerPlusMinus(iBaseLayer, (481000.0, 110000.0), 2000.0)
-
-#     oruxmap = OruxMap("RefTr")
-#     for iBaseLayer in (22,):  # (17, 18, 19, 20, 21, 22):
-#         oruxmap.createLayerPlusMinus(iBaseLayer, (776000.0, 276000.0), 2000.0)
-
-# if False:
-#     oruxmap = OruxMap("RefLuetzel")
-#     for iBaseLayer in (16,):
-#         oruxmap.createLayerPlusMinus(iBaseLayer, (700000.0, 236000.0), 2000.0)
+        f.write(TEMPLATE_LAYER_END)
