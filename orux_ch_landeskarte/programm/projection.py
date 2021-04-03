@@ -41,16 +41,38 @@ class CH1903:
 
 
 class BoundsCH1903:
-    def __init__(self, a: CH1903, b: CH1903):
+    def __init__(self, a: CH1903, b: CH1903, valid_data=True):
         assert isinstance(a, CH1903)
         assert isinstance(b, CH1903)
         self.a = a
         self.b = b
-        self.check()
+        if valid_data:
+            self.check()
 
     def check(self):
         assert self.a.lon < self.b.lon  # lon
         assert self.a.lat > self.b.lat  # lat
+
+    def extend(self, bounds):
+        assert isinstance(bounds, BoundsCH1903)
+        for x in (bounds.a, bounds.b):
+            self.a.lon = min(self.a.lon, x.lon)
+            self.b.lon = max(self.b.lon, x.lon)
+            self.a.lat = max(self.a.lat, x.lat)
+            self.b.lat = min(self.b.lat, x.lat)
+        self.check()
+
+    @property
+    def lon_m(self) -> float:
+        v = self.b.lon - self.a.lon
+        assert v > 0.0
+        return v
+
+    @property
+    def lat_m(self) -> float:
+        v = self.a.lat - self.b.lat
+        assert v > 0.0
+        return v
 
     def to_WGS84(self) -> "BoundsWGS84":
         northWest = self.a.to_WGS84()
@@ -61,6 +83,12 @@ class BoundsCH1903:
         northEast = CH1903(self.b.lon, self.a.lat).to_WGS84()
         assertWGS84IsNorthWest(northWest, southEast)
         return BoundsWGS84(northWest=northWest, northEast=northEast, southWest=southWest, southEast=southEast)
+
+
+def create_boundsCH1903_extrema():
+    extrema_NW = CH1903(lon=CH1903.LON_OFFSET + 1.0, lat=CH1903.LON_OFFSET - 1.0)
+    extrema_SE = CH1903(lon=CH1903.LON_OFFSET * 2.0, lat=CH1903.LAT_OFFSET + 1.0)
+    return BoundsCH1903(a=extrema_SE, b=extrema_NW, valid_data=False)
 
 
 class WGS84:

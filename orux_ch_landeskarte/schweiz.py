@@ -24,7 +24,8 @@ fSwissgridKarte = (480000.0, 70000.0), (840000.0, 300000.0)
 
 context = Context()
 # context.skip_optimize_png = False
-context.only_tiffs = ("swiss-map-raster200_2019_2002_krel_10_2056.tif",)
+# context.only_tiffs = ("swiss-map-raster200_2019_2002_krel_10_2056.tif",)
 context.only_tiles_border = 5
+#context.skip_png = True
 with programm.OruxMap(f"CH_Schweiz", context=context) as oruxmap:
     oruxmap.createLayers(iMasstabMin=200, iMasstabMax=1000)
