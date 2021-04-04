@@ -41,6 +41,7 @@ from dataclasses import dataclass
 import requests
 import PIL.Image
 import rasterio
+import rasterio.plot
 
 from oruxmap.utils import projection
 from oruxmap.utils.projection import CH1903, BoundsCH1903, create_boundsCH1903_extrema
@@ -98,8 +99,7 @@ class LayerParams:
 
     def verify_m_per_pixel(self, tiff_images):
         assert isinstance(tiff_images, TiffImage)
-        assert abs((tiff_images.m_per_pixel_lon / self.m_per_pixel) - 1.0) < 0.01
-        assert abs((tiff_images.m_per_pixel_lat / self.m_per_pixel) - 1.0) < 0.01
+        assert abs((tiff_images.m_per_pixel / self.m_per_pixel) - 1.0) < 0.001
 
 
 LIST_LAYERS = (
@@ -110,19 +110,32 @@ LIST_LAYERS = (
     # LayerParams(
     #     scale=2000,
     #     orux_layer=8,
+    #     m_per_pixel=32.0,
     # ),
-    LayerParams(scale=1000, orux_layer=10, tiff_filename="SMR1000_KREL.tif", m_per_pixel=1.0),
-    LayerParams(scale=500, orux_layer=11, tiff_filename="SMR500_KREL.tif", m_per_pixel=1.0),
-    LayerParams(scale=200, orux_layer=12, m_per_pixel=10.0, align_CH1903=CH1903(lon=3000.0, lat=2000.0, valid_data=False)),
+    LayerParams(
+        scale=1000,
+        orux_layer=10,
+        tiff_filename="SMR1000_KREL.tif",
+        m_per_pixel=50.0,
+    ),
+    LayerParams(
+        scale=500,
+        orux_layer=11,
+        tiff_filename="SMR500_KREL.tif",
+        m_per_pixel=25.0,
+    ),
+    LayerParams(
+        scale=200,
+        orux_layer=12,
+        m_per_pixel=10.0,
+        align_CH1903=CH1903(lon=3000.0, lat=2000.0, valid_data=False),
+    ),
     LayerParams(scale=100, orux_layer=13, m_per_pixel=5.0),
     LayerParams(scale=50, orux_layer=14, m_per_pixel=2.5),
     LayerParams(scale=25, orux_layer=15, m_per_pixel=1.25),
     LayerParams(scale=10, orux_layer=16, m_per_pixel=0.5),
 )
 
-
-class SkipException(Exception):
-    pass
 
 class OruxMap:
     def __init__(self, map_name, context):
@@ -142,11 +155,15 @@ class OruxMap:
         if filename_sqlite.exists():
             filename_sqlite.unlink()
         self.db = sqlite3.connect(filename_sqlite)
-        self.db.execute("""CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))""")
+        self.db.execute(
+            """CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))"""
+        )
         self.db.execute("""CREATE TABLE android_metadata (locale TEXT)""")
         self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
 
-        self.xml_otrk2 = OruxXmlOtrk2(filename=self.directory_map / f"{map_name}.otrk2.xml", map_name=map_name)
+        self.xml_otrk2 = OruxXmlOtrk2(
+            filename=self.directory_map / f"{map_name}.otrk2.xml", map_name=map_name
+        )
 
     def __enter__(self):
         return self
@@ -157,8 +174,12 @@ class OruxMap:
         self.db.commit()
         self.db.close()
         print("----- Ready")
-        print(f'The map now is ready in "{self.directory_map.relative_to(DIRECTORY_BASE)}".')
-        print("This directory must be copied 'by Hans' onto your android into 'oruxmaps/mapfiles\'.")
+        print(
+            f'The map now is ready in "{self.directory_map.relative_to(DIRECTORY_BASE)}".'
+        )
+        print(
+            "This directory must be copied 'by Hans' onto your android into 'oruxmaps/mapfiles'."
+        )
 
     def create_layers(self, iMasstabMin: int = 25, iMasstabMax: int = 500):
         start_s = time.perf_counter()
@@ -168,11 +189,7 @@ class OruxMap:
         print(f"Duration for this layer {time.perf_counter() - start_s:0.0f}s")
 
     def _create_layer(self, layer_param):
-        try:
-            map_scale = MapScale(self, layer_param)
-        except SkipException as ex:
-            print(f"SKIPPED: {ex}")
-            return
+        map_scale = MapScale(self, layer_param)
         map_scale.create_map()
 
 
@@ -211,7 +228,9 @@ class DebugLogger:
             f.write(f"all,{self.map_scale.boundsCH1903_extrema.csv}\n")
 
         with fopen("_png.csv") as f:
-            f.write(f"{DebugPng.csv_header()},{BoundsCH1903.csv_header('boundsCH1903')}\n")
+            f.write(
+                f"{DebugPng.csv_header()},{BoundsCH1903.csv_header('boundsCH1903')}\n"
+            )
             for tiff_image in self.map_scale.imageTiffs:
                 for debug_png in tiff_image.debug_pngs:
                     f.write(f"{debug_png.csv},{tiff_image.boundsCH1903.csv}\n")
@@ -231,15 +250,13 @@ class MapScale:
 
         self.imageTiffs = []
         for filename in self._tiffs:
-            try:
-                tiff_images = TiffImage(scale=self, filename=filename)
-                self.imageTiffs.append(tiff_images)
-            except SkipException as ex:
-                print(f"SKIPPED: {ex}")
-                continue
+            tiff_images = TiffImage(scale=self, filename=filename)
+            self.imageTiffs.append(tiff_images)
 
         if len(self.imageTiffs) == 0:
-            raise SkipException(f"No valid tiff for this scale {self.layer_param.scale} found")
+            raise Exception(
+                f"No valid tiff for this scale {self.layer_param.scale} found"
+            )
 
         for tiff_images in self.imageTiffs:
             self.layer_param.verify_m_per_pixel(tiff_images)
@@ -247,9 +264,13 @@ class MapScale:
         self.boundsCH1903_extrema = create_boundsCH1903_extrema()
         for tiff_images in self.imageTiffs:
             # Align the tiff and shrink it to complete tiles
-            bounds_shrinkedCH1903 = tiff_images.boundsCH1903.minus(self.layer_param.align_CH1903)
+            bounds_shrinkedCH1903 = tiff_images.boundsCH1903.minus(
+                self.layer_param.align_CH1903
+            )
             bounds_shrinkedCH1903.shrink_tilesize_m(self.layer_param.m_per_tile)
-            bounds_shrinkedCH1903 = bounds_shrinkedCH1903.plus(self.layer_param.align_CH1903)
+            bounds_shrinkedCH1903 = bounds_shrinkedCH1903.plus(
+                self.layer_param.align_CH1903
+            )
             self.boundsCH1903_extrema.extend(bounds_shrinkedCH1903)
             if False:
                 print(
@@ -260,16 +281,23 @@ class MapScale:
                     bounds_shrinkedCH1903.b.lat % self.layer_param.m_per_tile,
                 )
 
-        print(f"{self.layer_param.scale}: {len(self.imageTiffs)}tif {self.boundsCH1903_extrema.lon_m/1000.0:0.3f}x{self.boundsCH1903_extrema.lat_m/1000.0:0.3f}km")
+        print(
+            f"{self.layer_param.scale}: {len(self.imageTiffs)}tif {self.boundsCH1903_extrema.lon_m/1000.0:0.3f}x{self.boundsCH1903_extrema.lat_m/1000.0:0.3f}km"
+        )
 
-        width_pixel = int(self.boundsCH1903_extrema.lon_m / self.layer_param.m_per_pixel)
-        height_pixel = int(self.boundsCH1903_extrema.lat_m / self.layer_param.m_per_pixel)
+        width_pixel = int(
+            self.boundsCH1903_extrema.lon_m / self.layer_param.m_per_pixel
+        )
+        height_pixel = int(
+            self.boundsCH1903_extrema.lat_m / self.layer_param.m_per_pixel
+        )
         # assert width_pixel % self.layer_param.pixel_per_tile == 0
         # assert height_pixel % self.layer_param.pixel_per_tile == 0
 
         boundsWGS84 = self.boundsCH1903_extrema.to_WGS84()
 
-        self.orux_maps.xml_otrk2.write_layer(calib=boundsWGS84, 
+        self.orux_maps.xml_otrk2.write_layer(
+            calib=boundsWGS84,
             TILE_SIZE=self.layer_param.pixel_per_tile,
             map_name=self.orux_maps.map_name,
             id=self.layer_param.orux_layer,
@@ -341,19 +369,48 @@ class TiffImage:
         self.context = self.orux_maps.context
         self.layer_param = scale.layer_param
         with rasterio.open(filename, "r") as dataset:
-            if dataset.crs is None:
-                raise SkipException(f"No position found in {filename.relative_to(DIRECTORY_ORUX_SWISSTOPO)}")
-            boundsCH1903 = BoundsCH1903(CH1903(dataset.bounds.left, dataset.bounds.top), CH1903(dataset.bounds.right, dataset.bounds.bottom))
-            self.m_per_pixel_lon = boundsCH1903.lon_m / dataset.shape[1]
-            self.m_per_pixel_lat = boundsCH1903.lat_m / dataset.shape[0]
+            pixel_lon = dataset.width
+            pixel_lat = dataset.height
+
+            t = dataset.get_transform()
+            northwest_lon = t[0]
+            northwest_lat = t[3]
+            self.m_per_pixel = t[1]
+            assert t[1] == -t[5]
+            northwest = CH1903(lon=t[0], lat=t[3])
+            southeast = CH1903(
+                lon=northwest.lon + pixel_lon * self.m_per_pixel,
+                lat=northwest.lat - pixel_lat * self.m_per_pixel,
+            )
+            self.boundsCH1903 = BoundsCH1903(a=northwest, b=southeast)
+
         self.layer_param.verify_m_per_pixel(self)
-        projection.assertSwissgridIsNorthWest(boundsCH1903)
-        self.boundsCH1903 = boundsCH1903
+        projection.assertSwissgridIsNorthWest(self.boundsCH1903)
         self.debug_pngs = []
+
+    def _load_image(self):
+        with rasterio.open(self.filename, "r") as dataset:
+            if len(dataset.indexes) == 3:
+                # https://rasterio.readthedocs.io/en/latest/topics/image_processing.html
+                # rasterio: (bands, rows, columns)
+                # PIL: rows, columns, bands)
+                data = dataset.read()
+                img_arr = rasterio.plot.reshape_as_image(data)
+                img = PIL.Image.fromarray(img_arr, mode="RGB")
+                del data
+                del img_arr
+                assert dataset.width == img.width
+                assert dataset.height == img.height
+            else:
+                img = PIL.Image.open(self.filename, mode="r")
+            return img
 
     @property
     def _filename_pickle_png_cache(self):
-        return DIRECTORY_CACHE_PNG / f"{self.layer_param.name}_{self.filename.stem}{self.context.parts_png}.pickle"
+        return (
+            DIRECTORY_CACHE_PNG
+            / f"{self.layer_param.name}_{self.filename.stem}{self.context.parts_png}.pickle"
+        )
 
     def _save_purge_palette(self, fOut, img):
         if self.context.skip_optimize_png:
@@ -392,19 +449,14 @@ class TiffImage:
         self._save_purge_palette(fOut, im_crop)
         return fOut.getvalue()
 
-    def create_tiles(self, label):  # pylint: disable=too-many-statements,too-many-branches
+    def create_tiles(self, label):
         if self._filename_pickle_png_cache.exists():
             # The tile have already been created
             return
 
-        list_png, statistics = self._create_tiles2(label)
+        self._create_tiles2(label)
 
-        with self._filename_pickle_png_cache.open("wb") as f:
-            pickle.dump(list_png, f)
-
-        self._filename_pickle_png_cache.with_suffix(".txt").write_text(statistics)
-
-    def _create_tiles2(self, label):  # pylint: disable=too-many-statements,too-many-branches
+    def _create_tiles2(self, label):
         # We might not start at the top left -> We have to align the tiles
         # --> Offset pixel_x/pixel_y
         # --> Offset x, y
@@ -420,8 +472,14 @@ class TiffImage:
         assert x_offset_tile >= 0
         assert y_offset_tile >= 0
 
-        x_base_pixel = int(lon_offset_m / self.layer_param.m_per_pixel) % self.layer_param.pixel_per_tile
-        y_base_pixel = int(lat_offset_m / self.layer_param.m_per_pixel) % self.layer_param.pixel_per_tile
+        x_base_pixel = (
+            int(lon_offset_m / self.layer_param.m_per_pixel)
+            % self.layer_param.pixel_per_tile
+        )
+        y_base_pixel = (
+            int(lat_offset_m / self.layer_param.m_per_pixel)
+            % self.layer_param.pixel_per_tile
+        )
         assert x_base_pixel >= 0
         assert y_base_pixel >= 0
 
@@ -429,7 +487,7 @@ class TiffImage:
             return
 
         list_png = []
-        with PIL.Image.open(self.filename) as img:
+        with self._load_image() as img:
             #
             # Die Tiles fuer die Karte zusammenkopieren
             #
@@ -450,21 +508,38 @@ class TiffImage:
                     x_tile = x + x_offset_tile
                     x_tif_pixel = x * self.layer_param.pixel_per_tile + x_base_pixel
                     y_tif_pixel = y * self.layer_param.pixel_per_tile + y_base_pixel
-                    self.debug_pngs.append(DebugPng(tiff_filename=self.filename.name, x_tile=x_tile, y_tile=y_tile, x_tif_pixel=x_tif_pixel, y_tif_pixel=y_tif_pixel))
+                    self.debug_pngs.append(
+                        DebugPng(
+                            tiff_filename=self.filename.name,
+                            x_tile=x_tile,
+                            y_tile=y_tile,
+                            x_tif_pixel=x_tif_pixel,
+                            y_tif_pixel=y_tif_pixel,
+                        )
+                    )
                     png_count += 1
                     if self.context.skip_png_write:
                         continue
                     raw_png = self._extract_tile(img, x_tif_pixel, y_tif_pixel)
                     size_bytes += len(raw_png)
-                    list_png.append(PngCache(x_tile=x_tile, y_tile=y_tile, orux_layer=self.layer_param.orux_layer, raw_png=raw_png))
-                    # b = sqlite3.Binary(raw_png)
-                    # self.orux_maps.db.execute("insert or replace into tiles values (?,?,?,?)", (x_tile, y_tile, self.layer_param.orux_layer, b))
+                    list_png.append(
+                        PngCache(
+                            x_tile=x_tile,
+                            y_tile=y_tile,
+                            orux_layer=self.layer_param.orux_layer,
+                            raw_png=raw_png,
+                        )
+                    )
                 duration_s = time.perf_counter() - start_s
                 ms_per_tile = 1000.0 * duration_s / png_count
-                print(f"{label}. Image {png_count}({total}). Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes")
+                print(
+                    f"{label}. Image {png_count}({total}). Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes"
+                )
 
         statistics = f"{self.layer_param.name} {self.filename.name}, Total: {png_count}tiles {duration_s:0.0f}s {size_bytes/1000000:0.1f}Mbytes, Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes"
-        return list_png, statistics
+        with self._filename_pickle_png_cache.open("wb") as f:
+            pickle.dump(list_png, f)
+        self._filename_pickle_png_cache.with_suffix(".txt").write_text(statistics)
 
     def append_sqlite(self):  # pylint: disable=too-many-statements,too-many-branches
         with self._filename_pickle_png_cache.open("rb") as f:
@@ -472,4 +547,7 @@ class TiffImage:
 
         for png in list_png:
             b = sqlite3.Binary(png.raw_png)
-            self.orux_maps.db.execute("insert or replace into tiles values (?,?,?,?)", (png.x_tile, png.y_tile, png.orux_layer, b))
+            self.orux_maps.db.execute(
+                "insert or replace into tiles values (?,?,?,?)",
+                (png.x_tile, png.y_tile, png.orux_layer, b),
+            )

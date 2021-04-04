@@ -11,6 +11,7 @@ class CH1903:
 
     LON_OFFSET = 2000000.0
     LAT_OFFSET = 1000000.0
+    LAT_OFFSET_OUTSIDE = 90000.0 # The 1Mio swiss map is outside the 'allowed' range
     LAT_BERN = 600000.0
     LON_BERN = 200000.0
 
@@ -24,7 +25,7 @@ class CH1903:
 
     def check(self):
         assert self.lon > CH1903.LON_OFFSET
-        assert CH1903.LAT_OFFSET < self.lat < CH1903.LON_OFFSET
+        assert CH1903.LAT_OFFSET_OUTSIDE < self.lat < CH1903.LON_OFFSET
 
     def minus(self, point: "CH1903") -> "CH1903":
         assert isinstance(point, CH1903)
@@ -134,8 +135,8 @@ class WGS84:
         self.check()
 
     def check(self):
-        assert 5.0 < self.lon < 12.0
-        assert 45.0 < self.lat < 50.0
+        assert 3.5 < self.lon < 14.0
+        assert 44.0 < self.lat < 50.0
 
 
 class BoundsWGS84:
