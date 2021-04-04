@@ -1,12 +1,10 @@
 ﻿#!/usr/bin/python
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2010-2021 Hans Maerk, Maerki Informatik
-# License: LGPL (http://www.gnu.org/licenses/lgpl.html)
+# License: Apache License v2
 #
 # Siehe http://www.maerki.com/hans/orux
 #
-# Version: 1.0.5
 # History:
 #   2010-06-22, Hans Maerki, Implementiert
 #   2010-06-23, Hans Maerki, Koordinaten der Karte Massstab 1:50000 angepasst.
@@ -23,14 +21,13 @@ http://gpso.de/navigation/utm.html
   UTM- Koordinatensystem, WGS84- Kartendatum
 http://de.wikipedia.org/wiki/Kartendatum
   Geodaetisches Datum
-http://www.swisstopo.admin.ch/internet/swisstopo/de/home/topics/survey/sys/refsys/projection.html
+https://www.swisstopo.admin.ch/de/wissen-fakten/geodaesie-vermessung/bezugsysteme/kartenprojektionen.html
   Schweizerische Kartenprojektionen
-http://www.swisstopo.admin.ch/internet/swisstopo/de/home/apps/calc/navref.html
+https://www.swisstopo.admin.ch/de/karten-daten-online/calculation-services/navref.html
+https://www.swisstopo.admin.ch/content/swisstopo-internet/de/online/calculation-services/_jcr_content/contentPar/tabs/items/dokumente_und_publik/tabPar/downloadlist/downloadItems/8_1467103085694.download/refsys_d.pdf
   Umrechnung von Schweizer Landeskoordinaten in ellipsoidische WGS84-Koordinaten
 http://de.wikipedia.org/wiki/WGS_84
   World Geodetic System 1984 (WGS 84)
-http://www.ahnungslos.ch/android-screenshots-in-5-schritten/
-  Android Screen Capture
 """
 import io
 import time
@@ -48,6 +45,7 @@ import rasterio
 from oruxmap.utils import projection
 from oruxmap.utils.projection import CH1903, BoundsCH1903, create_boundsCH1903_extrema
 from oruxmap.utils.context import Context
+from oruxmap.utils.orux_xml_otrk2 import OruxXmlOtrk2
 
 DIRECTORY_ORUX_SWISSTOPO = pathlib.Path(__file__).absolute().parent
 DIRECTORY_RESOURCES = DIRECTORY_ORUX_SWISSTOPO / "resources"
@@ -92,7 +90,11 @@ class LayerParams:
 
     @property
     def m_per_tile(self) -> float:
-        return TILE_SIZE * self.m_per_pixel
+        return self.pixel_per_tile * self.m_per_pixel
+
+    @property
+    def pixel_per_tile(self) -> float:
+        return 400
 
     def verify_m_per_pixel(self, tiff_images):
         assert isinstance(tiff_images, TiffImage)
@@ -118,37 +120,9 @@ LIST_LAYERS = (
     LayerParams(scale=10, orux_layer=16, m_per_pixel=0.5),
 )
 
-TEMPLATE_LAYER_BEGIN = """    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="2.1">
-      <MapCalibration layers="false" layerLevel="{id}">
-        <MapName><![CDATA[{map_name} {id:d}]]></MapName>
-        <MapChunks xMax="{xMax}" yMax="{yMax}" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="{TILE_SIZE}" img_width="{TILE_SIZE}" file_name="{map_name}" />
-        <MapDimensions height="{height}" width="{width}" />
-        <MapBounds minLat="{minLat:2.6f}" maxLat="{maxLat:2.6f}" minLon="{minLon:2.6f}" maxLon="{maxLon:2.6f}" />
-        <CalibrationPoints>
-"""
-
-TEMPLATE_LAYER_END = """        </CalibrationPoints>
-      </MapCalibration>
-    </OruxTracker>
-"""
-
-
-TEMPLATE_MAIN_START = """<?xml version="1.0" encoding="UTF-8"?>
-<OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="3.0">
-  <MapCalibration layers="true" layerLevel="0">
-    <MapName><![CDATA[{map_name}]]></MapName>
-"""
-
-TEMPLATE_MAIN_END = """  </MapCalibration>
-</OruxTracker>"""
-
-# Wir unterstützen im Moment nur eine Tile-Grösse:
-TILE_SIZE = 400
-
 
 class SkipException(Exception):
     pass
-
 
 class OruxMap:
     def __init__(self, map_name, context):
@@ -172,15 +146,13 @@ class OruxMap:
         self.db.execute("""CREATE TABLE android_metadata (locale TEXT)""")
         self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
 
-        self.fXml = (self.directory_map / f"{map_name}.otrk2.xml").open("w")
-        self.fXml.write(TEMPLATE_MAIN_START.format(map_name=map_name))
+        self.xml_otrk2 = OruxXmlOtrk2(filename=self.directory_map / f"{map_name}.otrk2.xml", map_name=map_name)
 
     def __enter__(self):
         return self
 
     def __exit__(self, _type, value, tb):
-        self.fXml.write(TEMPLATE_MAIN_END)
-        self.fXml.close()
+        self.xml_otrk2.close()
 
         self.db.commit()
         self.db.close()
@@ -190,14 +162,14 @@ class OruxMap:
 
     def create_layers(self, iMasstabMin: int = 25, iMasstabMax: int = 500):
         start_s = time.perf_counter()
-        for layerParam in LIST_LAYERS:
-            if iMasstabMin <= layerParam.scale <= iMasstabMax:
-                self._create_layer(layerParam=layerParam)
+        for layer_param in LIST_LAYERS:
+            if iMasstabMin <= layer_param.scale <= iMasstabMax:
+                self._create_layer(layer_param=layer_param)
         print(f"Duration for this layer {time.perf_counter() - start_s:0.0f}s")
 
-    def _create_layer(self, layerParam):
+    def _create_layer(self, layer_param):
         try:
-            map_scale = MapScale(self, layerParam)
+            map_scale = MapScale(self, layer_param)
         except SkipException as ex:
             print(f"SKIPPED: {ex}")
             return
@@ -227,7 +199,7 @@ class DebugLogger:
 
     def report(self):
         def fopen(extension):
-            filename_base = f"debug_log_{self.map_scale.layerParam.name}"
+            filename_base = f"debug_log_{self.map_scale.layer_param.name}"
             filename = DIRECTORY_LOGS / (filename_base + extension)
             return filename.open("w")
 
@@ -250,12 +222,12 @@ class MapScale:
     This object represents one scale. For example 1:25'000, 1:50'000.
     """
 
-    def __init__(self, oruxMaps, layerParam):
-        self.oruxMaps = oruxMaps
-        self.layerParam = layerParam
+    def __init__(self, orux_maps, layer_param):
+        self.orux_maps = orux_maps
+        self.layer_param = layer_param
         # self.tile_list = TileList()
         self.debug_logger = DebugLogger(self)
-        assert self.layerParam.folder_resources.exists()
+        assert self.layer_param.folder_resources.exists()
 
         self.imageTiffs = []
         for filename in self._tiffs:
@@ -267,83 +239,70 @@ class MapScale:
                 continue
 
         if len(self.imageTiffs) == 0:
-            raise SkipException(f"No valid tiff for this scale {self.layerParam.scale} found")
+            raise SkipException(f"No valid tiff for this scale {self.layer_param.scale} found")
 
         for tiff_images in self.imageTiffs:
-            self.layerParam.verify_m_per_pixel(tiff_images)
+            self.layer_param.verify_m_per_pixel(tiff_images)
 
         self.boundsCH1903_extrema = create_boundsCH1903_extrema()
         for tiff_images in self.imageTiffs:
             # Align the tiff and shrink it to complete tiles
-            bounds_shrinkedCH1903 = tiff_images.boundsCH1903.minus(self.layerParam.align_CH1903)
-            bounds_shrinkedCH1903.shrink_tilesize_m(self.layerParam.m_per_tile)
-            bounds_shrinkedCH1903 = bounds_shrinkedCH1903.plus(self.layerParam.align_CH1903)
+            bounds_shrinkedCH1903 = tiff_images.boundsCH1903.minus(self.layer_param.align_CH1903)
+            bounds_shrinkedCH1903.shrink_tilesize_m(self.layer_param.m_per_tile)
+            bounds_shrinkedCH1903 = bounds_shrinkedCH1903.plus(self.layer_param.align_CH1903)
             self.boundsCH1903_extrema.extend(bounds_shrinkedCH1903)
             if False:
                 print(
                     tiff_images.filename.name,
-                    bounds_shrinkedCH1903.a.lon % self.layerParam.m_per_tile,
-                    bounds_shrinkedCH1903.a.lat % self.layerParam.m_per_tile,
-                    bounds_shrinkedCH1903.b.lon % self.layerParam.m_per_tile,
-                    bounds_shrinkedCH1903.b.lat % self.layerParam.m_per_tile,
+                    bounds_shrinkedCH1903.a.lon % self.layer_param.m_per_tile,
+                    bounds_shrinkedCH1903.a.lat % self.layer_param.m_per_tile,
+                    bounds_shrinkedCH1903.b.lon % self.layer_param.m_per_tile,
+                    bounds_shrinkedCH1903.b.lat % self.layer_param.m_per_tile,
                 )
 
-        print(f"{self.layerParam.scale}: {len(self.imageTiffs)}tif {self.boundsCH1903_extrema.lon_m/1000.0:0.3f}x{self.boundsCH1903_extrema.lat_m/1000.0:0.3f}km")
+        print(f"{self.layer_param.scale}: {len(self.imageTiffs)}tif {self.boundsCH1903_extrema.lon_m/1000.0:0.3f}x{self.boundsCH1903_extrema.lat_m/1000.0:0.3f}km")
 
-        width_pixel = int(self.boundsCH1903_extrema.lon_m / self.layerParam.m_per_pixel)
-        height_pixel = int(self.boundsCH1903_extrema.lat_m / self.layerParam.m_per_pixel)
-        # assert width_pixel % TILE_SIZE == 0
-        # assert height_pixel % TILE_SIZE == 0
+        width_pixel = int(self.boundsCH1903_extrema.lon_m / self.layer_param.m_per_pixel)
+        height_pixel = int(self.boundsCH1903_extrema.lat_m / self.layer_param.m_per_pixel)
+        # assert width_pixel % self.layer_param.pixel_per_tile == 0
+        # assert height_pixel % self.layer_param.pixel_per_tile == 0
 
         boundsWGS84 = self.boundsCH1903_extrema.to_WGS84()
 
-        f = self.oruxMaps.fXml
-
-        f.write(
-            TEMPLATE_LAYER_BEGIN.format(
-                TILE_SIZE=TILE_SIZE,
-                map_name=self.oruxMaps.map_name,
-                id=self.layerParam.orux_layer,
-                xMax=width_pixel // TILE_SIZE,
-                yMax=height_pixel // TILE_SIZE,
-                height=height_pixel,
-                width=width_pixel,
-                minLat=boundsWGS84.southEast.lat,
-                maxLat=boundsWGS84.northWest.lat,
-                minLon=boundsWGS84.northWest.lon,
-                maxLon=boundsWGS84.southEast.lon,
-            )
+        self.orux_maps.xml_otrk2.write_layer(calib=boundsWGS84, 
+            TILE_SIZE=self.layer_param.pixel_per_tile,
+            map_name=self.orux_maps.map_name,
+            id=self.layer_param.orux_layer,
+            xMax=width_pixel // self.layer_param.pixel_per_tile,
+            yMax=height_pixel // self.layer_param.pixel_per_tile,
+            height=height_pixel,
+            width=width_pixel,
+            minLat=boundsWGS84.southEast.lat,
+            maxLat=boundsWGS84.northWest.lat,
+            minLon=boundsWGS84.northWest.lon,
+            maxLon=boundsWGS84.southEast.lon,
         )
-        for strPoint, lon, lat in (
-            ("TL", boundsWGS84.northWest.lon, boundsWGS84.northWest.lat),
-            ("BR", boundsWGS84.southEast.lon, boundsWGS84.southEast.lat),
-            ("TR", boundsWGS84.northEast.lon, boundsWGS84.northEast.lat),
-            ("BL", boundsWGS84.southWest.lon, boundsWGS84.southWest.lat),
-        ):
-            f.write(f'          <CalibrationPoint corner="{strPoint}" lon="{lon:2.6f}" lat="{lat:2.6f}" />\n')
-
-        f.write(TEMPLATE_LAYER_END)
 
     @property
     def _tiffs(self):
-        if self.layerParam.tiff_filename:
+        if self.layer_param.tiff_filename:
             # For big scales, the image is stored in git
-            yield self.layerParam.folder_resources / self.layerParam.tiff_filename
+            yield self.layer_param.folder_resources / self.layer_param.tiff_filename
             return
 
-        filename_url_tiffs = self.layerParam.folder_resources / "url_tiffs.txt"
+        filename_url_tiffs = self.layer_param.folder_resources / "url_tiffs.txt"
         yield from self._download_tiffs(filename_url_tiffs)
 
     def _download_tiffs(self, filename_url_tiffs):
         assert filename_url_tiffs.exists()
-        self.layerParam.folder_cache.mkdir(exist_ok=True)
-        with self.layerParam.filename_url_tiffs.open("r") as f:
+        self.layer_param.folder_cache.mkdir(exist_ok=True)
+        with self.layer_param.filename_url_tiffs.open("r") as f:
             for url in sorted(f.readlines()):
                 url = url.strip()
                 name = url.split("/")[-1]
-                filename = self.layerParam.folder_cache / name
-                if self.oruxMaps.context.only_tiffs is not None:
-                    if filename.name not in self.oruxMaps.context.only_tiffs:
+                filename = self.layer_param.folder_cache / name
+                if self.orux_maps.context.only_tiffs is not None:
+                    if filename.name not in self.orux_maps.context.only_tiffs:
                         continue
                 if not filename.exists():
                     print(f"Downloading {filename.relative_to(DIRECTORY_BASE)}")
@@ -376,25 +335,25 @@ class PngCache:
 
 class TiffImage:
     def __init__(self, scale, filename):
-        self.oruxMaps = scale.oruxMaps
+        self.orux_maps = scale.orux_maps
         self.filename = filename
         self.scale = scale
-        self.context = self.oruxMaps.context
-        self.layerParam = scale.layerParam
+        self.context = self.orux_maps.context
+        self.layer_param = scale.layer_param
         with rasterio.open(filename, "r") as dataset:
             if dataset.crs is None:
                 raise SkipException(f"No position found in {filename.relative_to(DIRECTORY_ORUX_SWISSTOPO)}")
             boundsCH1903 = BoundsCH1903(CH1903(dataset.bounds.left, dataset.bounds.top), CH1903(dataset.bounds.right, dataset.bounds.bottom))
             self.m_per_pixel_lon = boundsCH1903.lon_m / dataset.shape[1]
             self.m_per_pixel_lat = boundsCH1903.lat_m / dataset.shape[0]
-        self.layerParam.verify_m_per_pixel(self)
+        self.layer_param.verify_m_per_pixel(self)
         projection.assertSwissgridIsNorthWest(boundsCH1903)
         self.boundsCH1903 = boundsCH1903
         self.debug_pngs = []
 
     @property
     def _filename_pickle_png_cache(self):
-        return DIRECTORY_CACHE_PNG / f"{self.layerParam.name}_{self.filename.stem}{self.context.parts_png}.pickle"
+        return DIRECTORY_CACHE_PNG / f"{self.layer_param.name}_{self.filename.stem}{self.context.parts_png}.pickle"
 
     def _save_purge_palette(self, fOut, img):
         if self.context.skip_optimize_png:
@@ -424,10 +383,10 @@ class TiffImage:
     def _extract_tile(self, img, topleft_x, topleft_y):
         assert 0 <= topleft_x < img.width
         assert 0 <= topleft_y < img.height
-        bottomright_x = topleft_x + TILE_SIZE
-        bottomright_y = topleft_y + TILE_SIZE
-        assert TILE_SIZE <= bottomright_x <= img.width
-        assert TILE_SIZE <= bottomright_y <= img.height
+        bottomright_x = topleft_x + self.layer_param.pixel_per_tile
+        bottomright_y = topleft_y + self.layer_param.pixel_per_tile
+        assert self.layer_param.pixel_per_tile <= bottomright_x <= img.width
+        assert self.layer_param.pixel_per_tile <= bottomright_y <= img.height
         im_crop = img.crop((topleft_x, topleft_y, bottomright_x, bottomright_y))
         fOut = io.BytesIO()
         self._save_purge_palette(fOut, im_crop)
@@ -452,17 +411,17 @@ class TiffImage:
         lon_offset_m = self.boundsCH1903.a.lon - self.scale.boundsCH1903_extrema.a.lon
         lat_offset_m = self.boundsCH1903.a.lat - self.scale.boundsCH1903_extrema.a.lat
         # offset is typically positiv, but the first tile may be negative
-        assert lon_offset_m >= -self.layerParam.m_per_tile
+        assert lon_offset_m >= -self.layer_param.m_per_tile
         # offset is typically negative, but the first tile may be positive
-        assert lat_offset_m <= self.layerParam.m_per_tile
+        assert lat_offset_m <= self.layer_param.m_per_tile
 
-        x_offset_tile = int(lon_offset_m / self.layerParam.m_per_tile)
-        y_offset_tile = int(-lat_offset_m / self.layerParam.m_per_tile)
+        x_offset_tile = int(lon_offset_m / self.layer_param.m_per_tile)
+        y_offset_tile = int(-lat_offset_m / self.layer_param.m_per_tile)
         assert x_offset_tile >= 0
         assert y_offset_tile >= 0
 
-        x_base_pixel = int(lon_offset_m / self.layerParam.m_per_pixel) % TILE_SIZE
-        y_base_pixel = int(lat_offset_m / self.layerParam.m_per_pixel) % TILE_SIZE
+        x_base_pixel = int(lon_offset_m / self.layer_param.m_per_pixel) % self.layer_param.pixel_per_tile
+        y_base_pixel = int(lat_offset_m / self.layer_param.m_per_pixel) % self.layer_param.pixel_per_tile
         assert x_base_pixel >= 0
         assert y_base_pixel >= 0
 
@@ -476,8 +435,8 @@ class TiffImage:
             #
             width = img.width - x_base_pixel
             height = img.height - y_base_pixel
-            x_count = width // TILE_SIZE
-            y_count = height // TILE_SIZE
+            x_count = width // self.layer_param.pixel_per_tile
+            y_count = height // self.layer_param.pixel_per_tile
             assert x_count > 0
             assert y_count > 0
             total = self.context.skip_count(x_count) * self.context.skip_count(y_count)
@@ -489,22 +448,22 @@ class TiffImage:
                 y_tile = y + y_offset_tile
                 for x in self.context.range(x_count):
                     x_tile = x + x_offset_tile
-                    x_tif_pixel = x * TILE_SIZE + x_base_pixel
-                    y_tif_pixel = y * TILE_SIZE + y_base_pixel
+                    x_tif_pixel = x * self.layer_param.pixel_per_tile + x_base_pixel
+                    y_tif_pixel = y * self.layer_param.pixel_per_tile + y_base_pixel
                     self.debug_pngs.append(DebugPng(tiff_filename=self.filename.name, x_tile=x_tile, y_tile=y_tile, x_tif_pixel=x_tif_pixel, y_tif_pixel=y_tif_pixel))
                     png_count += 1
                     if self.context.skip_png_write:
                         continue
                     raw_png = self._extract_tile(img, x_tif_pixel, y_tif_pixel)
                     size_bytes += len(raw_png)
-                    list_png.append(PngCache(x_tile=x_tile, y_tile=y_tile, orux_layer=self.layerParam.orux_layer, raw_png=raw_png))
+                    list_png.append(PngCache(x_tile=x_tile, y_tile=y_tile, orux_layer=self.layer_param.orux_layer, raw_png=raw_png))
                     # b = sqlite3.Binary(raw_png)
-                    # self.oruxMaps.db.execute("insert or replace into tiles values (?,?,?,?)", (x_tile, y_tile, self.layerParam.orux_layer, b))
+                    # self.orux_maps.db.execute("insert or replace into tiles values (?,?,?,?)", (x_tile, y_tile, self.layer_param.orux_layer, b))
                 duration_s = time.perf_counter() - start_s
                 ms_per_tile = 1000.0 * duration_s / png_count
                 print(f"{label}. Image {png_count}({total}). Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes")
 
-        statistics = f"{self.layerParam.name} {self.filename.name}, Total: {png_count}tiles {duration_s:0.0f}s {size_bytes/1000000:0.1f}Mbytes, Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes"
+        statistics = f"{self.layer_param.name} {self.filename.name}, Total: {png_count}tiles {duration_s:0.0f}s {size_bytes/1000000:0.1f}Mbytes, Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes"
         return list_png, statistics
 
     def append_sqlite(self):  # pylint: disable=too-many-statements,too-many-branches
@@ -513,4 +472,4 @@ class TiffImage:
 
         for png in list_png:
             b = sqlite3.Binary(png.raw_png)
-            self.oruxMaps.db.execute("insert or replace into tiles values (?,?,?,?)", (png.x_tile, png.y_tile, png.orux_layer, b))
+            self.orux_maps.db.execute("insert or replace into tiles values (?,?,?,?)", (png.x_tile, png.y_tile, png.orux_layer, b))

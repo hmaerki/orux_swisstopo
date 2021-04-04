@@ -10,7 +10,7 @@ def get_contextA():
     # context.skip_optimize_png = True
     context.only_tiffs = tiffs_wetzikon
     # context.only_tiles_border = 5
-    context.only_tiles_modulo = 10
+    # context.only_tiles_modulo = 10
     # context.skip_tiff_read = True
     # context.skip_png_write = True
     return context
@@ -25,4 +25,4 @@ for context in (
     get_contextB(),
 ):
     with OruxMap(f"CH_samples{context.parts_png}", context=context) as oruxmap:
-        oruxmap.create_layers(iMasstabMin=100, iMasstabMax=200)
+        oruxmap.create_layers(iMasstabMin=25, iMasstabMax=200)
