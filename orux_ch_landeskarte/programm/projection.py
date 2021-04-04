@@ -14,16 +14,25 @@ class CH1903:
     LAT_BERN = 600000.0
     LON_BERN = 200000.0
 
-    def __init__(self, lon: float, lat: float):
+    def __init__(self, lon: float, lat: float, valid_data=True):
         assert isinstance(lon, float)
         assert isinstance(lat, float)
         self.lon = lon
         self.lat = lat
-        self.check()
+        if valid_data:
+            self.check()
 
     def check(self):
         assert self.lon > CH1903.LON_OFFSET
         assert CH1903.LAT_OFFSET < self.lat < CH1903.LON_OFFSET
+
+    def minus(self, point: "CH1903") -> "CH1903":
+        assert isinstance(point, CH1903)
+        return CH1903(lon=self.lon - point.lon, lat=self.lat - point.lat)
+
+    def plus(self, point: "CH1903") -> "CH1903":
+        assert isinstance(point, CH1903)
+        return CH1903(lon=self.lon + point.lon, lat=self.lat + point.lat)
 
     def to_WGS84(self) -> "WGS84":
         """
@@ -73,6 +82,31 @@ class BoundsCH1903:
         v = self.a.lat - self.b.lat
         assert v > 0.0
         return v
+
+    def minus(self, point: CH1903) -> "BoundsCH1903":
+        assert isinstance(point, CH1903)
+        return BoundsCH1903(a=self.a.minus(point), b=self.b.minus(point))
+
+    def plus(self, point: CH1903) -> "BoundsCH1903":
+        assert isinstance(point, CH1903)
+        return BoundsCH1903(a=self.a.plus(point), b=self.b.plus(point))
+
+    def shrink_tilesize_m(self, tile_size_m: float) -> "BoundsCH1903":
+        """Cut incomplete tiles from top, left, bottom and right"""
+        assert isinstance(tile_size_m, float)
+        self.a.lon += -self.a.lon % tile_size_m
+        self.b.lon -= self.b.lon % tile_size_m
+        self.a.lat -= self.a.lat % tile_size_m
+        self.b.lat += -self.b.lat % tile_size_m
+
+    @property
+    def csv(self) -> str:
+        return f"{self.a.lon:0.1f},{self.a.lat:0.1f},{self.b.lon:0.1f},{self.b.lat:0.1f}"
+        # return f"{self.a.lon:0.1f},{self.b.lon:0.1f},{self.a.lat:0.1f},{self.b.lat:0.1f}"
+
+    @staticmethod
+    def csv_header(name: str) -> str:
+        return f"{name}.a.lon,{name}.a.lat,{name}.b.lon,{name}.b.lat"
 
     def to_WGS84(self) -> "BoundsWGS84":
         northWest = self.a.to_WGS84()
