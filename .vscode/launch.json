@@ -14,7 +14,7 @@
         "--rcfile=${workspaceFolder}/.pylintrc",
         "--verbose",
         "*.py",
-        "programm"
+        "oruxmap"
       ],
       "console": "integratedTerminal"
     },
@@ -28,7 +28,7 @@
         "--config",
         "${workspaceFolder}/.blackconfig.yaml",
         "*.py",
-        "programm/*.py"
+        "oruxmap/*.py"
       ],
       "console": "integratedTerminal"
     },

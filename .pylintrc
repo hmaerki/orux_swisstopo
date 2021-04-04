@@ -4,7 +4,7 @@
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use.
 jobs=0
-extension-pkg-whitelist=numpy,wx
+extension-pkg-whitelist=
 
 # Add files or directories to the blacklist
 ignore=

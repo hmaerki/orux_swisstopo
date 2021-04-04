@@ -1,3 +1,4 @@
+fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 fSwissgridKarte = (480000.0, 70000.0), (840000.0, 300000.0)
 
 tif_0010_wetzikon = "swiss-map-raster10_2020_1112-2_krel_0.5_2056.tif"

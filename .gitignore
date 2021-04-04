@@ -1,8 +1,8 @@
-orux_swisstopo/resources
-orux_swisstopo_cache_tif/
-orux_swisstopo_cache_png/
-orux_swisstopo_maps/
-orux_swisstopo_logs/
+oruxmap/resources
+target_cache_tif/
+target_cache_png/
+target_maps/
+target_logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
