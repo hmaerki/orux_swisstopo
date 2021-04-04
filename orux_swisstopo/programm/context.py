@@ -32,9 +32,11 @@ class Context:
 
     @property
     def parts_png(self) -> str:
-        parts = ['', ]
+        parts = [
+            "",
+        ]
         if not self.skip_optimize_png:
-            parts.append('optimize')
+            parts.append("optimize")
         if self.only_tiles_border or self.only_tiles_modulo:
-            parts.append('subset')
-        return '-'.join(parts)
+            parts.append("subset")
+        return "-".join(parts)

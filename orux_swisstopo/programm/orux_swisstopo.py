@@ -52,13 +52,13 @@ from programm.context import Context
 fSwissgridSchweiz = (480000.0, 60000.0), (865000.0, 302000.0)
 
 
-DIRECTORY_ORUX_CH_LANDESKARTE = pathlib.Path(__file__).absolute().parent.parent
-DIRECTORY_BASE = DIRECTORY_ORUX_CH_LANDESKARTE.parent
-DIRECTORY_CACHE_TIF = DIRECTORY_BASE / "orux_ch_landeskarte_cache_tif"
-DIRECTORY_CACHE_PNG = DIRECTORY_BASE / "orux_ch_landeskarte_cache_png"
-DIRECTORY_LOGS = DIRECTORY_BASE / "orux_ch_landeskarte_logs"
-DIRECTORY_MAPS = DIRECTORY_BASE / "orux_ch_landeskarte_maps"
-DIRECTORY_RESOURCES = DIRECTORY_ORUX_CH_LANDESKARTE / "resources"
+DIRECTORY_ORUX_SWISSTOPO = pathlib.Path(__file__).absolute().parent.parent
+DIRECTORY_RESOURCES = DIRECTORY_ORUX_SWISSTOPO / "resources"
+DIRECTORY_BASE = DIRECTORY_ORUX_SWISSTOPO.parent
+DIRECTORY_CACHE_TIF = DIRECTORY_BASE / "orux_swisstopo_cache_tif"
+DIRECTORY_CACHE_PNG = DIRECTORY_BASE / "orux_swisstopo_cache_png"
+DIRECTORY_LOGS = DIRECTORY_BASE / "orux_swisstopo_logs"
+DIRECTORY_MAPS = DIRECTORY_BASE / "orux_swisstopo_maps"
 
 DIRECTORY_CACHE_TIF.mkdir(exist_ok=True)
 DIRECTORY_CACHE_PNG.mkdir(exist_ok=True)
@@ -368,12 +368,14 @@ class MapScale:
 
         self.debug_logger.report()
 
+
 @dataclass
 class PngCache:
     x_tile: int
     y_tile: int
     orux_layer: int
     raw_png: bytes
+
 
 class TiffImage:
     def __init__(self, objMapScale, filename):
@@ -384,7 +386,7 @@ class TiffImage:
         self.layerParam = objMapScale.layerParam
         with rasterio.open(filename, "r") as dataset:
             if dataset.crs is None:
-                raise SkipException(f"No position found in {filename.relative_to(DIRECTORY_ORUX_CH_LANDESKARTE)}")
+                raise SkipException(f"No position found in {filename.relative_to(DIRECTORY_ORUX_SWISSTOPO)}")
             boundsCH1903 = BoundsCH1903(CH1903(dataset.bounds.left, dataset.bounds.top), CH1903(dataset.bounds.right, dataset.bounds.bottom))
             self.m_per_pixel_lon = boundsCH1903.lon_m / dataset.shape[1]
             self.m_per_pixel_lat = boundsCH1903.lat_m / dataset.shape[0]
@@ -395,7 +397,7 @@ class TiffImage:
 
     @property
     def filename_pickle_png_cache(self):
-        return DIRECTORY_CACHE_PNG / f'{self.layerParam.name}_{self.filename.stem}{self.context.parts_png}.pickle'
+        return DIRECTORY_CACHE_PNG / f"{self.layerParam.name}_{self.filename.stem}{self.context.parts_png}.pickle"
 
     def is_white_data(self, image_data):
         if len(image_data) > 1000:
@@ -506,14 +508,14 @@ class TiffImage:
                 ms_per_tile = 1000.0 * duration_s / count
                 print(f"{label}. Image {count}({total}). Per tile: {ms_per_tile:0.0f}ms {size/count/1000:0.1f}kbytes")
 
-        with self.filename_pickle_png_cache.open('wb') as f:
+        with self.filename_pickle_png_cache.open("wb") as f:
             pickle.dump(list_png, f)
 
-        statistics = f'{self.layerParam.name} {self.filename.name}, Total: {count}tiles {duration_s:0.0f}s {size/1000000:0.1f}Mbytes, Per tile: {ms_per_tile:0.0f}ms {size/count/1000:0.1f}kbytes'
-        self.filename_pickle_png_cache.with_suffix('.txt').write_text(statistics)
+        statistics = f"{self.layerParam.name} {self.filename.name}, Total: {count}tiles {duration_s:0.0f}s {size/1000000:0.1f}Mbytes, Per tile: {ms_per_tile:0.0f}ms {size/count/1000:0.1f}kbytes"
+        self.filename_pickle_png_cache.with_suffix(".txt").write_text(statistics)
 
     def append_sqlite(self):  # pylint: disable=too-many-statements,too-many-branches
-        with self.filename_pickle_png_cache.open('rb') as f:
+        with self.filename_pickle_png_cache.open("rb") as f:
             list_png = pickle.load(f)
 
         for png in list_png:

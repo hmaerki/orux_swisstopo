@@ -1,8 +1,8 @@
-orux_ch_landeskarte/resources
-orux_ch_landeskarte_cache_tif/
-orux_ch_landeskarte_cache_png/
-orux_ch_landeskarte_maps/
-orux_ch_landeskarte_logs/
+orux_swisstopo/resources
+orux_swisstopo_cache_tif/
+orux_swisstopo_cache_png/
+orux_swisstopo_maps/
+orux_swisstopo_logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
