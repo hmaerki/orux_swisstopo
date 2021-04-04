@@ -47,6 +47,7 @@ from oruxmap.utils import projection
 from oruxmap.utils.projection import CH1903, BoundsCH1903, create_boundsCH1903_extrema
 from oruxmap.utils.context import Context
 from oruxmap.utils.orux_xml_otrk2 import OruxXmlOtrk2
+from oruxmap.utils.download_zip_and_extract import DownloadZipAndExtractTiff
 
 DIRECTORY_ORUX_SWISSTOPO = pathlib.Path(__file__).absolute().parent
 DIRECTORY_RESOURCES = DIRECTORY_ORUX_SWISSTOPO / "resources"
@@ -71,6 +72,7 @@ class LayerParams:
     orux_layer: int
     m_per_pixel: float
     tiff_filename: str = None
+    url: str = None
     align_CH1903: CH1903 = CH1903(lon=0.0, lat=0.0, valid_data=False)
 
     @property
@@ -115,12 +117,14 @@ LIST_LAYERS = (
     LayerParams(
         scale=1000,
         orux_layer=10,
+        url='https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk1000.noscale/data.zip',
         tiff_filename="SMR1000_KREL.tif",
         m_per_pixel=50.0,
     ),
     LayerParams(
         scale=500,
         orux_layer=11,
+        url='https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/data.zip',
         tiff_filename="SMR500_KREL.tif",
         m_per_pixel=25.0,
     ),
@@ -314,8 +318,11 @@ class MapScale:
     @property
     def _tiffs(self):
         if self.layer_param.tiff_filename:
-            # For big scales, the image is stored in git
-            yield self.layer_param.folder_resources / self.layer_param.tiff_filename
+            # For big scales, the image has to be extracted form a zip file
+            tiff_filename = self.layer_param.folder_resources / self.layer_param.tiff_filename
+            d = DownloadZipAndExtractTiff(url=self.layer_param.url, tiff_filename=tiff_filename)
+            d.download()
+            yield tiff_filename
             return
 
         filename_url_tiffs = self.layer_param.folder_resources / "url_tiffs.txt"
