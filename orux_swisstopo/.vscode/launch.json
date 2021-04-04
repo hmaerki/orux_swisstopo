@@ -40,17 +40,17 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "Python: ZuercherOberland.py",
+      "name": "Python: create_map_samples.py",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/ZuercherOberland.py",
+      "program": "${workspaceFolder}/create_map_samples.py",
       "console": "integratedTerminal"
     },
     {
-      "name": "Python: schweiz.py",
+      "name": "Python: create_map_switzerland.py",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/schweiz.py",
+      "program": "${workspaceFolder}/create_map_switzerland.py",
       "console": "integratedTerminal"
     }
   ]
