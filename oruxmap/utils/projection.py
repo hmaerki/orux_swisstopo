@@ -11,7 +11,7 @@ class CH1903:
 
     LON_OFFSET = 2000000.0
     LAT_OFFSET = 1000000.0
-    LAT_OFFSET_OUTSIDE = 90000.0 # The 1Mio swiss map is outside the 'allowed' range
+    LAT_OFFSET_OUTSIDE = 90000.0  # The 1Mio swiss map is outside the 'allowed' range
     LAT_BERN = 600000.0
     LON_BERN = 200000.0
 
@@ -45,8 +45,21 @@ class CH1903:
 
         y = (lon - CH1903.LAT_BERN) / 1000000.0
         x = (lan - CH1903.LON_BERN) / 1000000.0
-        fLambda = 2.6779094 + 4.728982 * y + 0.791484 * y * x + 0.1306 * y * x * x - 0.0436 * y * y * y
-        fPhi = 16.9023892 + 3.238272 * x - 0.270978 * y * y - 0.002528 * x * x - 0.0447 * y * y * x - 0.0140 * x * x * x
+        fLambda = (
+            2.6779094
+            + 4.728982 * y
+            + 0.791484 * y * x
+            + 0.1306 * y * x * x
+            - 0.0436 * y * y * y
+        )
+        fPhi = (
+            16.9023892
+            + 3.238272 * x
+            - 0.270978 * y * y
+            - 0.002528 * x * x
+            - 0.0447 * y * y * x
+            - 0.0140 * x * x * x
+        )
         return WGS84(fLambda * 100.0 / 36.0, fPhi * 100.0 / 36.0)
 
 
@@ -102,7 +115,9 @@ class BoundsCH1903:
 
     @property
     def csv(self) -> str:
-        return f"{self.a.lon:0.1f},{self.a.lat:0.1f},{self.b.lon:0.1f},{self.b.lat:0.1f}"
+        return (
+            f"{self.a.lon:0.1f},{self.a.lat:0.1f},{self.b.lon:0.1f},{self.b.lat:0.1f}"
+        )
         # return f"{self.a.lon:0.1f},{self.b.lon:0.1f},{self.a.lat:0.1f},{self.b.lat:0.1f}"
 
     @staticmethod
@@ -117,7 +132,12 @@ class BoundsCH1903:
         # northEast = projection.CH1903_to_WGS84((self.fBSwissgrid[LON], self.fASwissgrid[LAT]))
         northEast = CH1903(self.b.lon, self.a.lat).to_WGS84()
         assertWGS84IsNorthWest(northWest, southEast)
-        return BoundsWGS84(northWest=northWest, northEast=northEast, southWest=southWest, southEast=southEast)
+        return BoundsWGS84(
+            northWest=northWest,
+            northEast=northEast,
+            southWest=southWest,
+            southEast=southEast,
+        )
 
 
 def create_boundsCH1903_extrema():
@@ -140,7 +160,9 @@ class WGS84:
 
 
 class BoundsWGS84:
-    def __init__(self, northWest: WGS84, northEast: WGS84, southWest: WGS84, southEast: WGS84):
+    def __init__(
+        self, northWest: WGS84, northEast: WGS84, southWest: WGS84, southEast: WGS84
+    ):
         assert isinstance(northWest, WGS84)
         assert isinstance(northEast, WGS84)
         assert isinstance(southWest, WGS84)

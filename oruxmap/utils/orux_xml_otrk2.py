@@ -25,6 +25,7 @@ TEMPLATE_MAIN_START = """<?xml version="1.0" encoding="UTF-8"?>
 TEMPLATE_MAIN_END = """  </MapCalibration>
 </OruxTracker>"""
 
+
 class OruxXmlOtrk2:
     def __init__(self, filename: pathlib.Path, map_name: str):
         assert isinstance(filename, pathlib.Path)
@@ -35,9 +36,7 @@ class OruxXmlOtrk2:
     def write_layer(self, calib: BoundsWGS84, **params):
         assert isinstance(calib, BoundsWGS84)
 
-        self.f.write(
-            TEMPLATE_LAYER_BEGIN.format(**params)
-        )
+        self.f.write(TEMPLATE_LAYER_BEGIN.format(**params))
 
         for strPoint, lon, lat in (
             ("TL", calib.northWest.lon, calib.northWest.lat),
@@ -45,7 +44,9 @@ class OruxXmlOtrk2:
             ("TR", calib.northEast.lon, calib.northEast.lat),
             ("BL", calib.southWest.lon, calib.southWest.lat),
         ):
-            self.f.write(f'          <CalibrationPoint corner="{strPoint}" lon="{lon:2.6f}" lat="{lat:2.6f}" />\n')
+            self.f.write(
+                f'          <CalibrationPoint corner="{strPoint}" lon="{lon:2.6f}" lat="{lat:2.6f}" />\n'
+            )
 
         self.f.write(TEMPLATE_LAYER_END)
 

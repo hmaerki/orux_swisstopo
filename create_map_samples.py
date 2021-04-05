@@ -8,7 +8,7 @@ from oruxmap.oruxmap import OruxMap
 
 def get_contextA():
     context = Context()
-    # context.skip_optimize_png = True
+    context.skip_optimize_png = True
     context.only_tiffs = tiffs_wetzikon
     # context.only_tiles_border = 5
     # context.only_tiles_modulo = 10
@@ -27,5 +27,5 @@ for context in (
     get_contextA(),
     get_contextB(),
 ):
-    with OruxMap(f"CH_samples{context.parts_png}", context=context) as oruxmap:
+    with OruxMap("CH_samples", context=context) as oruxmap:
         oruxmap.create_layers(iMasstabMin=10, iMasstabMax=1000)

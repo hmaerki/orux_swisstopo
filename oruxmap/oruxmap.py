@@ -72,7 +72,7 @@ class LayerParams:
     orux_layer: int
     m_per_pixel: float
     tiff_filename: str = None
-    url: str = None
+    tiff_url: str = None
     align_CH1903: CH1903 = CH1903(lon=0.0, lat=0.0, valid_data=False)
 
     @property
@@ -80,16 +80,16 @@ class LayerParams:
         return f"{self.scale:04d}"
 
     @property
-    def folder_resources(self):
+    def directory_resources(self):
         return DIRECTORY_RESOURCES / self.name
 
     @property
-    def folder_cache(self):
+    def directory_cache(self):
         return DIRECTORY_CACHE_TIF / self.name
 
     @property
     def filename_url_tiffs(self):
-        return self.folder_resources / "url_tiffs.txt"
+        return self.directory_resources / "url_tiffs.txt"
 
     @property
     def m_per_tile(self) -> float:
@@ -117,14 +117,14 @@ LIST_LAYERS = (
     LayerParams(
         scale=1000,
         orux_layer=10,
-        url='https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk1000.noscale/data.zip',
+        tiff_url="https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk1000.noscale/data.zip",
         tiff_filename="SMR1000_KREL.tif",
         m_per_pixel=50.0,
     ),
     LayerParams(
         scale=500,
         orux_layer=11,
-        url='https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/data.zip',
+        tiff_url="https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/data.zip",
         tiff_filename="SMR500_KREL.tif",
         m_per_pixel=25.0,
     ),
@@ -144,7 +144,7 @@ LIST_LAYERS = (
 class OruxMap:
     def __init__(self, map_name, context):
         assert isinstance(context, Context)
-        self.map_name = map_name
+        self.map_name = context.append_version(map_name)
         self.context = context
         self.directory_map = DIRECTORY_MAPS / map_name
 
@@ -250,7 +250,7 @@ class MapScale:
         self.layer_param = layer_param
         # self.tile_list = TileList()
         self.debug_logger = DebugLogger(self)
-        assert self.layer_param.folder_resources.exists()
+        assert self.layer_param.directory_resources.exists()
 
         self.imageTiffs = []
         for filename in self._tiffs:
@@ -319,23 +319,29 @@ class MapScale:
     def _tiffs(self):
         if self.layer_param.tiff_filename:
             # For big scales, the image has to be extracted form a zip file
-            tiff_filename = self.layer_param.folder_resources / self.layer_param.tiff_filename
-            d = DownloadZipAndExtractTiff(url=self.layer_param.url, tiff_filename=tiff_filename)
+            tiff_filename = (
+                DIRECTORY_CACHE_TIF
+                / self.layer_param.name
+                / self.layer_param.tiff_filename
+            )
+            d = DownloadZipAndExtractTiff(
+                url=self.layer_param.tiff_url, tiff_filename=tiff_filename
+            )
             d.download()
             yield tiff_filename
             return
 
-        filename_url_tiffs = self.layer_param.folder_resources / "url_tiffs.txt"
+        filename_url_tiffs = self.layer_param.directory_resources / "url_tiffs.txt"
         yield from self._download_tiffs(filename_url_tiffs)
 
     def _download_tiffs(self, filename_url_tiffs):
         assert filename_url_tiffs.exists()
-        self.layer_param.folder_cache.mkdir(exist_ok=True)
+        self.layer_param.directory_cache.mkdir(exist_ok=True)
         with self.layer_param.filename_url_tiffs.open("r") as f:
             for url in sorted(f.readlines()):
                 url = url.strip()
                 name = url.split("/")[-1]
-                filename = self.layer_param.folder_cache / name
+                filename = self.layer_param.directory_cache / name
                 if self.orux_maps.context.only_tiffs is not None:
                     if filename.name not in self.orux_maps.context.only_tiffs:
                         continue
@@ -416,7 +422,9 @@ class TiffImage:
     def _filename_pickle_png_cache(self):
         return (
             DIRECTORY_CACHE_PNG
-            / f"{self.layer_param.name}_{self.filename.stem}{self.context.parts_png}.pickle"
+            / self.context.append_version("png")
+            / self.layer_param.name
+            / self.filename.with_suffix(".pickle").name
         )
 
     def _save_purge_palette(self, fOut, img):
@@ -460,6 +468,7 @@ class TiffImage:
         if self._filename_pickle_png_cache.exists():
             # The tile have already been created
             return
+        self._filename_pickle_png_cache.parent.mkdir(exist_ok=True, parents=True)
 
         self._create_tiles2(label)
 

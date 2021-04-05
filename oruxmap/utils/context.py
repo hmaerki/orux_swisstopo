@@ -30,13 +30,12 @@ class Context:
 
         yield from range(count)
 
-    @property
-    def parts_png(self) -> str:
+    def append_version(self, basename: str) -> str:
         parts = [
-            "",
+            basename,
         ]
-        if not self.skip_optimize_png:
-            parts.append("optimize")
+        if self.skip_optimize_png:
+            parts.append("skipoptimize")
         if self.only_tiles_border or self.only_tiles_modulo:
             parts.append("subset")
         return "-".join(parts)

@@ -28,7 +28,8 @@
         "--config",
         "${workspaceFolder}/.blackconfig.yaml",
         "*.py",
-        "oruxmap/*.py"
+        "oruxmap/*.py",
+        "oruxmap/utils/*.py"
       ],
       "console": "integratedTerminal"
     },

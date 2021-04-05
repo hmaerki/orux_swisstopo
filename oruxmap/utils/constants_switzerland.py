@@ -9,4 +9,13 @@ tif_0200_wetzikon = "swiss-map-raster200_2019_2002_krel_10_2056.tif"
 tif_0500_wetzikon = "SMR500_KREL.tif"
 tif_1000_wetzikon = "SMR1000_KREL.tif"
 
-tiffs_wetzikon = (tif_0010_wetzikon, tif_0010_luetzelsee, tif_0025_wetzikon, tif_0050_wetzikon, tif_0100_wetzikon, tif_0200_wetzikon, tif_0500_wetzikon, tif_1000_wetzikon)
+tiffs_wetzikon = (
+    tif_0010_wetzikon,
+    tif_0010_luetzelsee,
+    tif_0025_wetzikon,
+    tif_0050_wetzikon,
+    tif_0100_wetzikon,
+    tif_0200_wetzikon,
+    tif_0500_wetzikon,
+    tif_1000_wetzikon,
+)
