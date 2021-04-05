@@ -1,0 +1,6 @@
+.git
+**/*.pdf
+**/*.odg
+**/__pycache__
+obsolete
+target/

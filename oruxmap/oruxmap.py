@@ -35,6 +35,7 @@ import shutil
 import pathlib
 import pickle
 import sqlite3
+import shutil
 
 from dataclasses import dataclass
 
@@ -53,11 +54,13 @@ from oruxmap.layers_switzerland import LIST_LAYERS
 DIRECTORY_ORUX_SWISSTOPO = pathlib.Path(__file__).absolute().parent
 DIRECTORY_RESOURCES = DIRECTORY_ORUX_SWISSTOPO / "resources"
 DIRECTORY_BASE = DIRECTORY_ORUX_SWISSTOPO.parent
-DIRECTORY_CACHE_TIF = DIRECTORY_BASE / "target_cache_tif"
-DIRECTORY_CACHE_PNG = DIRECTORY_BASE / "target_cache_png"
-DIRECTORY_LOGS = DIRECTORY_BASE / "target_logs"
-DIRECTORY_MAPS = DIRECTORY_BASE / "target_maps"
+DIRECTORY_TARGET = DIRECTORY_BASE / "target"
+DIRECTORY_CACHE_TIF = DIRECTORY_TARGET / "cache_tif"
+DIRECTORY_CACHE_PNG = DIRECTORY_TARGET / "cache_png"
+DIRECTORY_LOGS = DIRECTORY_TARGET / "logs"
+DIRECTORY_MAPS = DIRECTORY_TARGET / "maps"
 
+DIRECTORY_TARGET.mkdir(exist_ok=True)
 DIRECTORY_CACHE_TIF.mkdir(exist_ok=True)
 DIRECTORY_CACHE_PNG.mkdir(exist_ok=True)
 DIRECTORY_LOGS.mkdir(exist_ok=True)
@@ -103,6 +106,13 @@ class OruxMap:
 
         self.db.commit()
         self.db.close()
+
+        filename_zip = shutil.make_archive(
+            base_name=str(self.directory_map),
+            root_dir=str(self.directory_map.parent),
+            base_dir=self.directory_map.name,
+            format="zip",
+        )
         print("----- Ready")
         print(
             f'The map now is ready in "{self.directory_map.relative_to(DIRECTORY_BASE)}".'

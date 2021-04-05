@@ -1,4 +1,5 @@
-﻿#!/usr/bin/python
+﻿#!/usr/bin/env python3
+
 # pylint: disable=redefined-outer-name
 
 from oruxmap.utils.context import Context

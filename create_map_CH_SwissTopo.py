@@ -1,4 +1,4 @@
-﻿#!/usr/bin/python
+﻿#!/usr/bin/env python3
 
 from oruxmap.utils.context import Context
 from oruxmap.utils.constants_switzerland import tiffs_wetzikon

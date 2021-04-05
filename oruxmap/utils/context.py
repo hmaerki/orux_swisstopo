@@ -35,7 +35,7 @@ class Context:
             basename,
         ]
         if self.skip_optimize_png:
-            parts.append("skipoptimize")
+            parts.append("skip_optimize")
         if self.only_tiles_border or self.only_tiles_modulo:
             parts.append("subset")
         return "-".join(parts)

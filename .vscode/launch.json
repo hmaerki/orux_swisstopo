@@ -47,17 +47,17 @@
       "module": "oruxmap.test_unpickle"
     },
     {
-      "name": "Python: create_map_samples.py",
+      "name": "Python: create_map_CH_samples.py",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/create_map_samples.py",
+      "program": "${workspaceFolder}/create_map_CH_samples.py",
       "console": "integratedTerminal"
     },
     {
-      "name": "Python: create_map_switzerland.py",
+      "name": "Python: create_map_CH_SwissTopo.py",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/create_map_switzerland.py",
+      "program": "${workspaceFolder}/create_map_CH_SwissTopo.py",
       "console": "integratedTerminal"
     }
   ]

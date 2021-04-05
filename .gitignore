@@ -1,9 +1,5 @@
 obsolete
-target_cache_tif/
-target_cache_png/
-target_maps/
-target_logs/
-oruxmap/resources/2000
+target/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
