@@ -8,7 +8,7 @@ from oruxmap.oruxmap import OruxMap
 
 def get_contextA():
     context = Context()
-    context.skip_optimize_png = True
+    # context.skip_optimize_png = True
     context.only_tiffs = tiffs_wetzikon
     # context.only_tiles_border = 5
     # context.only_tiles_modulo = 10

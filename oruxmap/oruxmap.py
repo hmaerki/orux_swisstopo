@@ -48,6 +48,7 @@ from oruxmap.utils.projection import CH1903, BoundsCH1903, create_boundsCH1903_e
 from oruxmap.utils.context import Context
 from oruxmap.utils.orux_xml_otrk2 import OruxXmlOtrk2
 from oruxmap.utils.download_zip_and_extract import DownloadZipAndExtractTiff
+from oruxmap.layers_switzerland import LIST_LAYERS
 
 DIRECTORY_ORUX_SWISSTOPO = pathlib.Path(__file__).absolute().parent
 DIRECTORY_RESOURCES = DIRECTORY_ORUX_SWISSTOPO / "resources"
@@ -66,87 +67,12 @@ assert DIRECTORY_MAPS.exists()
 PIL.Image.MAX_IMAGE_PIXELS = None
 
 
-@dataclass
-class LayerParams:
-    scale: int
-    orux_layer: int
-    m_per_pixel: float
-    tiff_filename: str = None
-    tiff_url: str = None
-    align_CH1903: CH1903 = CH1903(lon=0.0, lat=0.0, valid_data=False)
-
-    @property
-    def name(self):
-        return f"{self.scale:04d}"
-
-    @property
-    def directory_resources(self):
-        return DIRECTORY_RESOURCES / self.name
-
-    @property
-    def directory_cache(self):
-        return DIRECTORY_CACHE_TIF / self.name
-
-    @property
-    def filename_url_tiffs(self):
-        return self.directory_resources / "url_tiffs.txt"
-
-    @property
-    def m_per_tile(self) -> float:
-        return self.pixel_per_tile * self.m_per_pixel
-
-    @property
-    def pixel_per_tile(self) -> float:
-        return 400
-
-    def verify_m_per_pixel(self, tiff_images):
-        assert isinstance(tiff_images, TiffImage)
-        assert abs((tiff_images.m_per_pixel / self.m_per_pixel) - 1.0) < 0.001
-
-
-LIST_LAYERS = (
-    # LayerParams(
-    #     scale=5000,
-    #     orux_layer=8,
-    # ),
-    # LayerParams(
-    #     scale=2000,
-    #     orux_layer=8,
-    #     m_per_pixel=32.0,
-    # ),
-    LayerParams(
-        scale=1000,
-        orux_layer=10,
-        tiff_url="https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk1000.noscale/data.zip",
-        tiff_filename="SMR1000_KREL.tif",
-        m_per_pixel=50.0,
-    ),
-    LayerParams(
-        scale=500,
-        orux_layer=11,
-        tiff_url="https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/data.zip",
-        tiff_filename="SMR500_KREL.tif",
-        m_per_pixel=25.0,
-    ),
-    LayerParams(
-        scale=200,
-        orux_layer=12,
-        m_per_pixel=10.0,
-        align_CH1903=CH1903(lon=3000.0, lat=2000.0, valid_data=False),
-    ),
-    LayerParams(scale=100, orux_layer=13, m_per_pixel=5.0),
-    LayerParams(scale=50, orux_layer=14, m_per_pixel=2.5),
-    LayerParams(scale=25, orux_layer=15, m_per_pixel=1.25),
-    LayerParams(scale=10, orux_layer=16, m_per_pixel=0.5),
-)
-
-
 class OruxMap:
     def __init__(self, map_name, context):
         assert isinstance(context, Context)
         self.map_name = context.append_version(map_name)
         self.context = context
-        self.directory_map = DIRECTORY_MAPS / map_name
+        self.directory_map = DIRECTORY_MAPS / self.map_name
 
         print("===== ", self.map_name)
 
@@ -250,7 +176,8 @@ class MapScale:
         self.layer_param = layer_param
         # self.tile_list = TileList()
         self.debug_logger = DebugLogger(self)
-        assert self.layer_param.directory_resources.exists()
+        self.directory_resources = DIRECTORY_RESOURCES / self.layer_param.name
+        assert self.directory_resources.exists()
 
         self.imageTiffs = []
         for filename in self._tiffs:
@@ -331,17 +258,18 @@ class MapScale:
             yield tiff_filename
             return
 
-        filename_url_tiffs = self.layer_param.directory_resources / "url_tiffs.txt"
+        filename_url_tiffs = self.directory_resources / "url_tiffs.txt"
         yield from self._download_tiffs(filename_url_tiffs)
 
     def _download_tiffs(self, filename_url_tiffs):
         assert filename_url_tiffs.exists()
-        self.layer_param.directory_cache.mkdir(exist_ok=True)
-        with self.layer_param.filename_url_tiffs.open("r") as f:
+        directory_cache = DIRECTORY_CACHE_TIF / self.layer_param.name
+        directory_cache.mkdir(exist_ok=True)
+        with filename_url_tiffs.open("r") as f:
             for url in sorted(f.readlines()):
                 url = url.strip()
                 name = url.split("/")[-1]
-                filename = self.layer_param.directory_cache / name
+                filename = directory_cache / name
                 if self.orux_maps.context.only_tiffs is not None:
                     if filename.name not in self.orux_maps.context.only_tiffs:
                         continue
