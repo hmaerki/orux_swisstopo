@@ -29,4 +29,4 @@ for context in (
     get_contextB(),
 ):
     with OruxMap("CH_samples", context=context) as oruxmap:
-        oruxmap.create_layers(iMasstabMin=10, iMasstabMax=1000)
+        oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)

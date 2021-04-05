@@ -35,7 +35,6 @@ import shutil
 import pathlib
 import pickle
 import sqlite3
-import shutil
 
 from dataclasses import dataclass
 
@@ -69,6 +68,17 @@ assert DIRECTORY_MAPS.exists()
 
 PIL.Image.MAX_IMAGE_PIXELS = None
 
+class DurationLogger:
+    def __init__(self, step: str):
+        self.step = step
+        self.start_s = time.perf_counter()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, value, tb):
+        print(f"{self.step} took {time.perf_counter() - self.start_s:0.0f}s")
+
 
 class OruxMap:
     def __init__(self, map_name, context):
@@ -79,15 +89,20 @@ class OruxMap:
 
         print("===== ", self.map_name)
 
-        if self.directory_map.exists():
-            shutil.rmtree(self.directory_map)
-            time.sleep(1.0)
+        # Remove zip file
+        filename_zip = self.directory_map.with_suffix('.zip')
+        if filename_zip.exists():
+            filename_zip.unlink()
+
+        # Create empty directory
+        for filename in self.directory_map.glob('*.*'):
+            filename.unlink()
         self.directory_map.mkdir(parents=True, exist_ok=True)
 
         filename_sqlite = self.directory_map / "OruxMapsImages.db"
         if filename_sqlite.exists():
             filename_sqlite.unlink()
-        self.db = sqlite3.connect(filename_sqlite)
+        self.db = sqlite3.connect(filename_sqlite, isolation_level=None)
         self.db.execute(
             """CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))"""
         )
@@ -104,15 +119,18 @@ class OruxMap:
     def __exit__(self, _type, value, tb):
         self.xml_otrk2.close()
 
-        self.db.commit()
-        self.db.close()
+        with DurationLogger("sqlite.execute('VACUUM')") as duration:
+            self.db.commit()
+            self.db.execute("VACUUM")
+            self.db.close()
 
-        filename_zip = shutil.make_archive(
-            base_name=str(self.directory_map),
-            root_dir=str(self.directory_map.parent),
-            base_dir=self.directory_map.name,
-            format="zip",
-        )
+        with DurationLogger("zip") as duration:
+            filename_zip = shutil.make_archive(
+                base_name=str(self.directory_map),
+                root_dir=str(self.directory_map.parent),
+                base_dir=self.directory_map.name,
+                format="zip",
+            )
         print("----- Ready")
         print(
             f'The map now is ready in "{self.directory_map.relative_to(DIRECTORY_BASE)}".'
@@ -122,11 +140,11 @@ class OruxMap:
         )
 
     def create_layers(self, iMasstabMin: int = 25, iMasstabMax: int = 500):
-        start_s = time.perf_counter()
-        for layer_param in LIST_LAYERS:
-            if iMasstabMin <= layer_param.scale <= iMasstabMax:
-                self._create_layer(layer_param=layer_param)
-        print(f"Duration for this layer {time.perf_counter() - start_s:0.0f}s")
+        with DurationLogger(f"Layer {self.map_name}") as duration:
+            start_s = time.perf_counter()
+            for layer_param in LIST_LAYERS:
+                if iMasstabMin <= layer_param.scale <= iMasstabMax:
+                    self._create_layer(layer_param=layer_param)
 
     def _create_layer(self, layer_param):
         map_scale = MapScale(self, layer_param)
