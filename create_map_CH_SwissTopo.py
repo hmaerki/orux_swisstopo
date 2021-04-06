@@ -14,3 +14,6 @@ context = Context()
 
 with OruxMap(f"CH_SwissTopo", context=context) as oruxmap:
     oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
+
+with OruxMap(f"CH_SwissTopo10k", context=context) as oruxmap:
+    oruxmap.create_layers(iMasstabMin=10, iMasstabMax=1000)
