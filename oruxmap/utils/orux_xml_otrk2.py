@@ -6,7 +6,7 @@ TEMPLATE_LAYER_BEGIN = """    <OruxTracker xmlns="http://oruxtracker.com/app/res
         <MapName><![CDATA[{map_name} {id:d}]]></MapName>
         <MapChunks xMax="{xMax}" yMax="{yMax}" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="{TILE_SIZE}" img_width="{TILE_SIZE}" file_name="{map_name}" />
         <MapDimensions height="{height}" width="{width}" />
-        <MapBounds minLat="{minLat:2.6f}" maxLat="{maxLat:2.6f}" minLon="{minLon:2.6f}" maxLon="{maxLon:2.6f}" />
+        <MapBounds minLat="{minLat:2.6f}" maxLat="{maxLat:2.6f}" minLon="{minLon:2.6f}" maxLon="{maxLon:2.6f}" xmargin="256" ymargin="256" />
         <CalibrationPoints>
 """
 
@@ -30,7 +30,7 @@ class OruxXmlOtrk2:
     def __init__(self, filename: pathlib.Path, map_name: str):
         assert isinstance(filename, pathlib.Path)
         assert isinstance(map_name, str)
-        self.f = filename.open("w")
+        self.f = filename.open("w", encoding="ascii")
         self.f.write(TEMPLATE_MAIN_START.format(map_name=map_name))
 
     def write_layer(self, calib: BoundsWGS84, **params):
@@ -45,7 +45,7 @@ class OruxXmlOtrk2:
             ("BL", calib.southWest.lon_m, calib.southWest.lat_m),
         ):
             self.f.write(
-                f'          <CalibrationPoint corner="{strPoint}" lon_m="{lon_m:2.6f}" lat_m="{lat_m:2.6f}" />\n'
+                f'          <CalibrationPoint corner="{strPoint}" lon="{lon_m:2.6f}" lat="{lat_m:2.6f}" />\n'
             )
 
         self.f.write(TEMPLATE_LAYER_END)

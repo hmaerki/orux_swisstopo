@@ -28,5 +28,8 @@ for context in (
     get_contextA(),
     get_contextB(),
 ):
-    with OruxMap("CH_samples", context=context) as oruxmap:
+    with OruxMap("CH_samples_25k_up", context=context) as oruxmap:
         oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
+
+    with OruxMap("CH_samples_10k", context=context) as oruxmap:
+        oruxmap.create_layers(iMasstabMin=10, iMasstabMax=10)

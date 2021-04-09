@@ -8,6 +8,7 @@ class LayerParams:
     m_per_pixel: float
     tiff_filename: str = None
     tiff_url: str = None
+    pixel_per_tile: int = 400
 
     @property
     def name(self):
@@ -16,10 +17,6 @@ class LayerParams:
     @property
     def m_per_tile(self) -> float:
         return self.pixel_per_tile * self.m_per_pixel
-
-    @property
-    def pixel_per_tile(self) -> float:
-        return 400
 
     def verify_m_per_pixel(self, tiff_images: "TiffImage"):
         assert tiff_images.__class__.__name__ == "TiffImage"
@@ -58,5 +55,5 @@ LIST_LAYERS = (
     LayerParams(scale=100, orux_layer=13, m_per_pixel=5.0),
     LayerParams(scale=50, orux_layer=14, m_per_pixel=2.5),
     LayerParams(scale=25, orux_layer=15, m_per_pixel=1.25),
-    LayerParams(scale=10, orux_layer=16, m_per_pixel=0.5),
+    LayerParams(scale=10, orux_layer=16, m_per_pixel=0.5, pixel_per_tile=500),
 )

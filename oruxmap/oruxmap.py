@@ -29,7 +29,7 @@ https://www.swisstopo.admin.ch/content/swisstopo-internet/de/online/calculation-
 http://de.wikipedia.org/wiki/WGS_84
   World Geodetic System 1984 (WGS 84)
 """
-import io
+import math
 import time
 import shutil
 import pathlib
@@ -49,6 +49,7 @@ from oruxmap.utils.context import Context
 from oruxmap.utils.orux_xml_otrk2 import OruxXmlOtrk2
 from oruxmap.utils.download_zip_and_extract import DownloadZipAndExtractTiff
 from oruxmap.layers_switzerland import LIST_LAYERS
+from oruxmap.utils.img_png import extract_tile
 
 DIRECTORY_ORUX_SWISSTOPO = pathlib.Path(__file__).absolute().parent
 DIRECTORY_RESOURCES = DIRECTORY_ORUX_SWISSTOPO / "resources"
@@ -100,18 +101,20 @@ class OruxMap:
             filename.unlink()
         self.directory_map.mkdir(parents=True, exist_ok=True)
 
-        filename_sqlite = self.directory_map / "OruxMapsImages.db"
-        if filename_sqlite.exists():
-            filename_sqlite.unlink()
-        self.db = sqlite3.connect(filename_sqlite, isolation_level=None)
+        self.filename_sqlite = self.directory_map / "OruxMapsImages.db"
+        if self.filename_sqlite.exists():
+            self.filename_sqlite.unlink()
+        self.db = sqlite3.connect(self.filename_sqlite, isolation_level=None)
+        self.db.execute("pragma journal_mode=OFF")
         self.db.execute(
             """CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))"""
         )
-        self.db.execute("""CREATE TABLE android_metadata (locale TEXT)""")
+        self.db.execute("""CREATE TABLE "android_metadata" (locale TEXT)""")
         self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
 
         self.xml_otrk2 = OruxXmlOtrk2(
-            filename=self.directory_map / f"{map_name}.otrk2.xml", map_name=map_name
+            filename=self.directory_map / f"{self.map_name}.otrk2.xml",
+            map_name=self.map_name,
         )
 
     def __enter__(self):
@@ -120,11 +123,16 @@ class OruxMap:
     def __exit__(self, _type, value, tb):
         self.xml_otrk2.close()
 
-        with DurationLogger("sqlite.execute('VACUUM')") as duration:
-            self.db.commit()
-            if not self.context.skip_sqlite_vacuum:
+        self.db.commit()
+        if not self.context.skip_sqlite_vacuum:
+            with DurationLogger("sqlite.execute('VACUUM')") as duration:
+                before_bytes = self.filename_sqlite.stat().st_size
                 self.db.execute("VACUUM")
-            self.db.close()
+                after_bytes = self.filename_sqlite.stat().st_size
+                print(
+                    f"Vaccum by {100.0*(before_bytes-after_bytes)/before_bytes:0.0f}%"
+                )
+        self.db.close()
 
         if not self.context.skip_map_zip:
             with DurationLogger("zip") as duration:
@@ -313,12 +321,12 @@ class MapScale:
         self.debug_logger.report()
 
 
-
 @dataclass
 class PngCache:
     x_tile: int
     y_tile: int
     raw_png: bytes
+
 
 @dataclass
 class TiffCache:
@@ -348,6 +356,11 @@ class TiffImage:
         with rasterio.open(filename, "r") as dataset:
             pixel_lon = dataset.width
             pixel_lat = dataset.height
+            calculated_pixel_per_tile = math.gcd(pixel_lon, pixel_lat)
+            if self.layer_param.pixel_per_tile != calculated_pixel_per_tile:
+                print(
+                    f"{filename.relative_to(DIRECTORY_BASE)}: pixel_per_tile: expected {self.layer_param.pixel_per_tile}, calculated {calculated_pixel_per_tile}"
+                )
 
             t = dataset.get_transform()
             northwest_lon = t[0]
@@ -361,10 +374,10 @@ class TiffImage:
             )
             self.boundsCH1903 = BoundsCH1903(nw=northwest, se=southeast)
             self.boundsCH1903_floor = self.boundsCH1903.floor(
-                self.layer_param.m_per_tile
+                floor_m=self.layer_param.m_per_tile,
             )
             if not self.boundsCH1903.equals(self.boundsCH1903_floor):
-                print(f'{filename.relative_to(DIRECTORY_BASE)}: cropped')
+                print(f"{filename.relative_to(DIRECTORY_BASE)}: cropped")
 
         self.layer_param.verify_m_per_pixel(self)
         projection.assertSwissgridIsNorthWest(self.boundsCH1903)
@@ -397,69 +410,6 @@ class TiffImage:
             / self.filename.with_suffix(".pickle").name
         )
 
-    def _save_purge_palette(self, fOut, img):
-        if self.context.skip_optimize_png:
-            # optimize=False, compress_level=0: 8ms 480.6kbytes
-            # optimize=False, compress_level=1: 13ms 136.7kbytes
-            # optimize=False, compress_level=3: 20ms 124.5kbytes
-            # optimize=True,  compress_level=9: 502ms 106.1kbytes
-            img.save(fOut, format="PNG", optimize=False, compress_level=1)
-            return
-
-        # img = img.convert("RGB")
-
-        # TODO: Go through the color palette and prune similar colors
-        if False:
-            threshold = 10
-            found = True
-            histogram = img.histogram()
-            for r,g,b in zip(histogram[0:256], histogram[256:512],histogram[512:768]):
-                s = r+g+b
-                if 0 < s < threshold:
-                    found = True
-                    break
-            if found:
-                # Without: optimize=True, compress_level=9: f40ms 73.3kbytes
-                # With:    optimize=True, compress_level=9: 108ms 73.3kbytes
-                data = list(img.getdata())
-                for i, v in enumerate(data):
-                    if sum(v) < threshold:
-                        data[i] = (0, 0, 0)
-                img.putdata(data)
-
-        img = img.quantize(colors=256, method=PIL.Image.FASTOCTREE, kmeans=0, palette=None, dither=PIL.Image.NONE)
-        # optimize=True,  compress_level=9: 56ms 21.6kbytes
-        img.save(fOut, format="PNG", optimize=True, compress_level=9)
-        # img.save('/tmp/xy.png', format="PNG", optimize=True, compress_level=9)
-        return
-
-        img = img.convert("P", palette=PIL.Image.ADAPTIVE)
-        # Now the palette is reordered: At the beginning are used colors
-        colors = -1
-        for v in img.histogram():
-            if v > 0:
-                colors += 1
-        bits = colors.bit_length()
-        # Only store the part of the palette which is used
-        ## optimize=True,  compress_level=9: 108ms 73.3kbytes
-        ## optimize=False, compress_level=3: 103ms 75.0kbytes
-        ## optimize=True , compress_level=3: 113ms 73.3kbytes
-        ## ..                              : 107ms 57.8kbytes (full image: img.convert("P", palette=PIL.Image.ADAPTIVE)
-        # optimize=True,  compress_level=9: 44ms 73.3kbytes
-        img.save(fOut, format="PNG", optimize=True, compress_level=9, bits=bits)
-
-    def _extract_tile(self, img, topleft_x, topleft_y):
-        assert 0 <= topleft_x < img.width
-        assert 0 <= topleft_y < img.height
-        bottomright_x = topleft_x + self.layer_param.pixel_per_tile
-        bottomright_y = topleft_y + self.layer_param.pixel_per_tile
-        assert self.layer_param.pixel_per_tile <= bottomright_x <= img.width
-        assert self.layer_param.pixel_per_tile <= bottomright_y <= img.height
-        im_crop = img.crop((topleft_x, topleft_y, bottomright_x, bottomright_y))
-        fOut = io.BytesIO()
-        self._save_purge_palette(fOut, im_crop)
-        return fOut.getvalue()
-
     def create_tiles(self, label):
         if self._filename_pickle_png_cache.exists():
             # The tile have already been created
@@ -478,9 +428,8 @@ class TiffImage:
         assert lon_offset_m >= 0
         assert lat_offset_m <= 0
 
-        m_per_pixel = round(self.m_per_pixel)
-        x_first_tile_pixel = lon_offset_m // m_per_pixel
-        y_first_tile_pixel = -lat_offset_m // m_per_pixel
+        x_first_tile_pixel = round(lon_offset_m // self.layer_param.m_per_pixel)
+        y_first_tile_pixel = round(-lat_offset_m // self.layer_param.m_per_pixel)
 
         assert 0 <= x_first_tile_pixel < self.layer_param.pixel_per_tile
         assert 0 <= y_first_tile_pixel < self.layer_param.pixel_per_tile
@@ -488,15 +437,13 @@ class TiffImage:
         if self.context.skip_tiff_read:
             return
 
-        tiff_cache = TiffCache(orux_layer=self.layer_param.orux_layer, nw=self.boundsCH1903_floor.nw)
+        tiff_cache = TiffCache(
+            orux_layer=self.layer_param.orux_layer, nw=self.boundsCH1903_floor.nw
+        )
         with self._load_image() as img:
             #
             # Die Tiles fuer die Karte zusammenkopieren
             #
-            # x_count = (self.boundsCH1903_floor.se.lon_m - self.boundsCH1903_floor.nw.lon_m) / self.layer_param.m_per_tile
-            # y_count = (self.boundsCH1903_floor.nw.lat_m - self.boundsCH1903_floor.se.lat_m) / self.layer_param.m_per_tile
-            # x_count = round(x_count)
-            # y_count = round(y_count)
             width = img.width - x_first_tile_pixel
             height = img.height - y_first_tile_pixel
             x_count = width // self.layer_param.pixel_per_tile
@@ -510,8 +457,12 @@ class TiffImage:
             # for y in range(y_count):
             for y_tile in self.context.range(y_count):
                 for x_tile in self.context.range(x_count):
-                    x_tif_pixel = x_tile * self.layer_param.pixel_per_tile + x_first_tile_pixel
-                    y_tif_pixel = y_tile * self.layer_param.pixel_per_tile + y_first_tile_pixel
+                    x_tif_pixel = (
+                        x_tile * self.layer_param.pixel_per_tile + x_first_tile_pixel
+                    )
+                    y_tif_pixel = (
+                        y_tile * self.layer_param.pixel_per_tile + y_first_tile_pixel
+                    )
                     self.debug_pngs.append(
                         DebugPng(
                             tiff_filename=self.filename.name,
@@ -524,7 +475,13 @@ class TiffImage:
                     png_count += 1
                     if self.context.skip_png_write:
                         continue
-                    raw_png = self._extract_tile(img, x_tif_pixel, y_tif_pixel)
+                    raw_png = extract_tile(
+                        img=img,
+                        topleft_x=x_tif_pixel,
+                        topleft_y=y_tif_pixel,
+                        pixel_per_tile=self.layer_param.pixel_per_tile,
+                        skip_optimize_png=self.context.skip_optimize_png,
+                    )
                     size_bytes += len(raw_png)
                     tiff_cache.append(
                         PngCache(
@@ -548,9 +505,26 @@ class TiffImage:
         with self._filename_pickle_png_cache.open("rb") as f:
             tiff_cache: TiffCache = pickle.load(f)
 
+        lon_offset_m = tiff_cache.nw.lon_m - self.scale.boundsCH1903_extrema.nw.lon_m
+        lat_offset_m = self.scale.boundsCH1903_extrema.nw.lat_m - tiff_cache.nw.lat_m
+        lon_offset_m = round(lon_offset_m)
+        lat_offset_m = round(lat_offset_m)
+        assert lon_offset_m >= 0
+        assert lat_offset_m >= 0
+
+        x_tile_offset = round(lon_offset_m // self.layer_param.m_per_tile)
+        y_tile_offset = round(lat_offset_m // self.layer_param.m_per_tile)
+        assert x_tile_offset >= 0
+        assert y_tile_offset >= 0
+
         for png in tiff_cache.list_png:
             b = sqlite3.Binary(png.raw_png)
             self.orux_maps.db.execute(
                 "insert or replace into tiles values (?,?,?,?)",
-                (png.x_tile, png.y_tile, tiff_cache.orux_layer, b),
+                (
+                    png.x_tile + x_tile_offset,
+                    png.y_tile + y_tile_offset,
+                    tiff_cache.orux_layer,
+                    b,
+                ),
             )
