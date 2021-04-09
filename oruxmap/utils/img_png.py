@@ -1,5 +1,7 @@
 import io
 
+import PIL.Image
+
 
 def _save_purge_palette(fOut, img, skip_optimize_png):
     if skip_optimize_png:
@@ -10,53 +12,26 @@ def _save_purge_palette(fOut, img, skip_optimize_png):
         img.save(fOut, format="PNG", optimize=False, compress_level=1)
         return
 
-    # img = img.convert("RGB")
-
-    # TODO: Go through the color palette and prune similar colors
-    if False:
-        threshold = 10
-        found = True
-        histogram = img.histogram()
-        for r, g, b in zip(histogram[0:256], histogram[256:512], histogram[512:768]):
-            s = r + g + b
-            if 0 < s < threshold:
-                found = True
-                break
-        if found:
-            # Without: optimize=True, compress_level=9: f40ms 73.3kbytes
-            # With:    optimize=True, compress_level=9: 108ms 73.3kbytes
-            data = list(img.getdata())
-            for i, v in enumerate(data):
-                if sum(v) < threshold:
-                    data[i] = (0, 0, 0)
-            img.putdata(data)
-
-    img = img.quantize(
-        colors=256,
-        method=PIL.Image.FASTOCTREE,
-        kmeans=0,
-        palette=None,
-        dither=PIL.Image.NONE,
-    )
-    # optimize=True,  compress_level=9: 56ms 21.6kbytes
-    img.save(fOut, format="PNG", optimize=True, compress_level=9)
-    # img.save('/tmp/xy.png', format="PNG", optimize=True, compress_level=9)
-    return
+    if True:
+        img = img.quantize(
+            colors=256,
+            method=PIL.Image.FASTOCTREE,
+            kmeans=0,
+            palette=None,
+            dither=PIL.Image.NONE,
+        )
+        # 25k, optimize=True,  compress_level=9: 41ms 9.0kbytes
+        # 25k, optimize=False, compress_level=9: 41ms 9.0kbytes
+        # 25k, optimize=False, compress_level=8: 20ms 9.1kbytes <<-
+        # 25k, optimize=False, compress_level=7: 8ms 9.7kbytes
+        # 25k, optimize=True,  compress_level=7: 11ms 9.7kbytes
+        # optimize=True,  compress_level=9: 56ms 21.6kbytes
+        img.save(fOut, format="PNG", optimize=False, compress_level=8)
+        return
 
     img = img.convert("P", palette=PIL.Image.ADAPTIVE)
-    # Now the palette is reordered: At the beginning are used colors
-    colors = -1
-    for v in img.histogram():
-        if v > 0:
-            colors += 1
-    bits = colors.bit_length()
-    # Only store the part of the palette which is used
-    ## optimize=True,  compress_level=9: 108ms 73.3kbytes
-    ## optimize=False, compress_level=3: 103ms 75.0kbytes
-    ## optimize=True , compress_level=3: 113ms 73.3kbytes
-    ## ..                              : 107ms 57.8kbytes (full image: img.convert("P", palette=PIL.Image.ADAPTIVE)
-    # optimize=True,  compress_level=9: 44ms 73.3kbytes
-    img.save(fOut, format="PNG", optimize=True, compress_level=9, bits=bits)
+    # 25k, optimize=False, compress_level=8: 22ms 9.3kbytes
+    img.save(fOut, format="PNG", optimize=False, compress_level=8)
 
 
 def extract_tile(img, topleft_x, topleft_y, pixel_per_tile, skip_optimize_png):
