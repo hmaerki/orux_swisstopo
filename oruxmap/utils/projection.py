@@ -9,42 +9,42 @@ class CH1903:
     Hombrechtikon   700  234      47.25052 8.76696
     """
 
-    LON_OFFSET = 2000000.0
-    LAT_OFFSET = 1000000.0
-    LAT_OFFSET_OUTSIDE = 90000.0  # The 1Mio swiss map is outside the 'allowed' range
-    LAT_BERN = 600000.0
-    LON_BERN = 200000.0
+    LON_OFFSET_M = 2000000.0
+    LAT_OFFSET_M = 1000000.0
+    LAT_OFFSET_OUTSIDE_M = 90000.0  # The 1Mio swiss map is outside the 'allowed' range
+    LAT_BERN_M = 600000.0
+    LON_BERN_M = 200000.0
 
-    def __init__(self, lon: float, lat: float, valid_data=True):
-        assert isinstance(lon, float)
-        assert isinstance(lat, float)
-        self.lon = lon
-        self.lat = lat
+    def __init__(self, lon_m: float, lat_m: float, valid_data=True):
+        assert isinstance(lon_m, float)
+        assert isinstance(lat_m, float)
+        self.lon_m = lon_m
+        self.lat_m = lat_m
         if valid_data:
             self.check()
 
     def check(self):
-        assert self.lon > CH1903.LON_OFFSET
-        assert CH1903.LAT_OFFSET_OUTSIDE < self.lat < CH1903.LON_OFFSET
+        assert self.lon_m > CH1903.LON_OFFSET_M
+        assert CH1903.LAT_OFFSET_OUTSIDE_M < self.lat_m < CH1903.LON_OFFSET_M
 
     def minus(self, point: "CH1903") -> "CH1903":
         assert isinstance(point, CH1903)
-        return CH1903(lon=self.lon - point.lon, lat=self.lat - point.lat)
+        return CH1903(lon_m=self.lon_m - point.lon_m, lat_m=self.lat_m - point.lat_m)
 
     def plus(self, point: "CH1903") -> "CH1903":
         assert isinstance(point, CH1903)
-        return CH1903(lon=self.lon + point.lon, lat=self.lat + point.lat)
+        return CH1903(lon_m=self.lon_m + point.lon_m, lat_m=self.lat_m + point.lat_m)
 
     def to_WGS84(self) -> "WGS84":
         """
         E entspricht Lambda (8.x), y (7xx)
         N entspricht Phi (46.x), x (2xx)
         """
-        lan = self.lat - CH1903.LAT_OFFSET
-        lon = self.lon - CH1903.LON_OFFSET
+        lan = self.lat_m - CH1903.LAT_OFFSET_M
+        lon_m = self.lon_m - CH1903.LON_OFFSET_M
 
-        y = (lon - CH1903.LAT_BERN) / 1000000.0
-        x = (lan - CH1903.LON_BERN) / 1000000.0
+        y = (lon_m - CH1903.LAT_BERN_M) / 1000000.0
+        x = (lan - CH1903.LON_BERN_M) / 1000000.0
         fLambda = (
             2.6779094
             + 4.728982 * y
@@ -64,73 +64,73 @@ class CH1903:
 
 
 class BoundsCH1903:
-    def __init__(self, a: CH1903, b: CH1903, valid_data=True):
-        assert isinstance(a, CH1903)
-        assert isinstance(b, CH1903)
-        self.a = a
-        self.b = b
+    def __init__(self, nw: CH1903, se: CH1903, valid_data=True):
+        assert isinstance(nw, CH1903)
+        assert isinstance(se, CH1903)
+        self.nw = nw
+        self.se = se
         if valid_data:
             self.check()
 
     def check(self):
-        assert self.a.lon < self.b.lon  # lon
-        assert self.a.lat > self.b.lat  # lat
+        assert self.nw.lon_m < self.se.lon_m
+        assert self.nw.lat_m > self.se.lat_m
 
     def extend(self, bounds):
         assert isinstance(bounds, BoundsCH1903)
-        for x in (bounds.a, bounds.b):
-            self.a.lon = min(self.a.lon, x.lon)
-            self.b.lon = max(self.b.lon, x.lon)
-            self.a.lat = max(self.a.lat, x.lat)
-            self.b.lat = min(self.b.lat, x.lat)
+        for x in (bounds.nw, bounds.se):
+            self.nw.lon_m = min(self.nw.lon_m, x.lon_m)
+            self.se.lon_m = max(self.se.lon_m, x.lon_m)
+            self.nw.lat_m = max(self.nw.lat_m, x.lat_m)
+            self.se.lat_m = min(self.se.lat_m, x.lat_m)
         self.check()
 
     @property
     def lon_m(self) -> float:
-        v = self.b.lon - self.a.lon
+        v = self.se.lon_m - self.nw.lon_m
         assert v > 0.0
         return v
 
     @property
     def lat_m(self) -> float:
-        v = self.a.lat - self.b.lat
+        v = self.nw.lat_m - self.se.lat_m
         assert v > 0.0
         return v
 
     def minus(self, point: CH1903) -> "BoundsCH1903":
         assert isinstance(point, CH1903)
-        return BoundsCH1903(a=self.a.minus(point), b=self.b.minus(point))
+        return BoundsCH1903(nw=self.nw.minus(point), se=self.se.minus(point))
 
     def plus(self, point: CH1903) -> "BoundsCH1903":
         assert isinstance(point, CH1903)
-        return BoundsCH1903(a=self.a.plus(point), b=self.b.plus(point))
+        return BoundsCH1903(nw=self.nw.plus(point), se=self.se.plus(point))
 
     def shrink_tilesize_m(self, tile_size_m: float) -> "BoundsCH1903":
         """Cut incomplete tiles from top, left, bottom and right"""
         assert isinstance(tile_size_m, float)
-        self.a.lon += -self.a.lon % tile_size_m
-        self.b.lon -= self.b.lon % tile_size_m
-        self.a.lat -= self.a.lat % tile_size_m
-        self.b.lat += -self.b.lat % tile_size_m
+        self.nw.lon_m += -self.nw.lon_m % tile_size_m
+        self.se.lon_m -= self.se.lon_m % tile_size_m
+        self.nw.lat_m -= self.nw.lat_m % tile_size_m
+        self.se.lat_m += -self.se.lat_m % tile_size_m
 
     @property
     def csv(self) -> str:
         return (
-            f"{self.a.lon:0.1f},{self.a.lat:0.1f},{self.b.lon:0.1f},{self.b.lat:0.1f}"
+            f"{self.nw.lon_m:0.1f},{self.nw.lat_m:0.1f},{self.se.lon_m:0.1f},{self.se.lat_m:0.1f}"
         )
-        # return f"{self.a.lon:0.1f},{self.b.lon:0.1f},{self.a.lat:0.1f},{self.b.lat:0.1f}"
+        # return f"{self.nw.lon_m:0.1f},{self.se.lon_m:0.1f},{self.nw.lat_m:0.1f},{self.se.lat_m:0.1f}"
 
     @staticmethod
     def csv_header(name: str) -> str:
-        return f"{name}.a.lon,{name}.a.lat,{name}.b.lon,{name}.b.lat"
+        return f"{name}.nw.lon_m,{name}.nw.lat_m,{name}.se.lon_m,{name}.se.lat_m"
 
     def to_WGS84(self) -> "BoundsWGS84":
-        northWest = self.a.to_WGS84()
-        southEast = self.b.to_WGS84()
+        northWest = self.nw.to_WGS84()
+        southEast = self.se.to_WGS84()
         # southWest = projection.CH1903_to_WGS84((self.fASwissgrid[LON], self.fBSwissgrid[LAT]))
-        southWest = CH1903(self.a.lon, self.b.lat).to_WGS84()
+        southWest = CH1903(self.nw.lon_m, self.se.lat_m).to_WGS84()
         # northEast = projection.CH1903_to_WGS84((self.fBSwissgrid[LON], self.fASwissgrid[LAT]))
-        northEast = CH1903(self.b.lon, self.a.lat).to_WGS84()
+        northEast = CH1903(self.se.lon_m, self.nw.lat_m).to_WGS84()
         assertWGS84IsNorthWest(northWest, southEast)
         return BoundsWGS84(
             northWest=northWest,
@@ -141,22 +141,22 @@ class BoundsCH1903:
 
 
 def create_boundsCH1903_extrema():
-    extrema_NW = CH1903(lon=CH1903.LON_OFFSET + 1.0, lat=CH1903.LON_OFFSET - 1.0)
-    extrema_SE = CH1903(lon=CH1903.LON_OFFSET * 2.0, lat=CH1903.LAT_OFFSET + 1.0)
-    return BoundsCH1903(a=extrema_SE, b=extrema_NW, valid_data=False)
+    extrema_NW = CH1903(lon_m=CH1903.LON_OFFSET_M + 1.0, lat_m=CH1903.LON_OFFSET_M - 1.0)
+    extrema_SE = CH1903(lon_m=CH1903.LON_OFFSET_M * 2.0, lat_m=CH1903.LAT_OFFSET_M + 1.0)
+    return BoundsCH1903(nw=extrema_SE, se=extrema_NW, valid_data=False)
 
 
 class WGS84:
-    def __init__(self, lon: float, lat: float):
-        assert isinstance(lon, float)
-        assert isinstance(lat, float)
-        self.lon = lon
-        self.lat = lat
+    def __init__(self, lon_m: float, lat_m: float):
+        assert isinstance(lon_m, float)
+        assert isinstance(lat_m, float)
+        self.lon_m = lon_m
+        self.lat_m = lat_m
         self.check()
 
     def check(self):
-        assert 3.5 < self.lon < 14.0
-        assert 44.0 < self.lat < 50.0
+        assert 3.5 < self.lon_m < 14.0
+        assert 44.0 < self.lat_m < 50.0
 
 
 class BoundsWGS84:
@@ -174,18 +174,18 @@ class BoundsWGS84:
         self.check()
 
     def check(self):
-        assert self.northWest.lon < self.northEast.lon  # lon
-        assert self.southWest.lon < self.southEast.lon  # lon
-        assert self.southWest.lat < self.northWest.lat  # lat
-        assert self.southEast.lat < self.northEast.lat  # lat
+        assert self.northWest.lon_m < self.northEast.lon_m  # lon_m
+        assert self.southWest.lon_m < self.southEast.lon_m  # lon_m
+        assert self.southWest.lat_m < self.northWest.lat_m  # lat_m
+        assert self.southEast.lat_m < self.northEast.lat_m  # lat_m
 
         assertWGS84IsNorthWest(self.northWest, self.southEast)
 
 
 # a is north west of b
 def assertSwissgridIsNorthWest(bounds: BoundsCH1903):
-    assert bounds.a.lon < bounds.b.lon
-    assert bounds.a.lat > bounds.b.lat
+    assert bounds.nw.lon_m < bounds.se.lon_m
+    assert bounds.nw.lat_m > bounds.se.lat_m
 
 
 # a is north west of b
@@ -201,8 +201,8 @@ def assertPixelsIsNorthWest(a, b):
 
 
 def assertWGS84IsNorthWest(a, b):
-    assert a.lon < b.lon
-    assert a.lat > b.lat
+    assert a.lon_m < b.lon_m
+    assert a.lat_m > b.lat_m
 
 
 # def add(a, b):

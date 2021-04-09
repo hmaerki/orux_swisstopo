@@ -38,14 +38,14 @@ class OruxXmlOtrk2:
 
         self.f.write(TEMPLATE_LAYER_BEGIN.format(**params))
 
-        for strPoint, lon, lat in (
-            ("TL", calib.northWest.lon, calib.northWest.lat),
-            ("BR", calib.southEast.lon, calib.southEast.lat),
-            ("TR", calib.northEast.lon, calib.northEast.lat),
-            ("BL", calib.southWest.lon, calib.southWest.lat),
+        for strPoint, lon_m, lat_m in (
+            ("TL", calib.northWest.lon_m, calib.northWest.lat_m),
+            ("BR", calib.southEast.lon_m, calib.southEast.lat_m),
+            ("TR", calib.northEast.lon_m, calib.northEast.lat_m),
+            ("BL", calib.southWest.lon_m, calib.southWest.lat_m),
         ):
             self.f.write(
-                f'          <CalibrationPoint corner="{strPoint}" lon="{lon:2.6f}" lat="{lat:2.6f}" />\n'
+                f'          <CalibrationPoint corner="{strPoint}" lon_m="{lon_m:2.6f}" lat_m="{lat_m:2.6f}" />\n'
             )
 
         self.f.write(TEMPLATE_LAYER_END)

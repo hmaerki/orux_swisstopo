@@ -68,6 +68,7 @@ assert DIRECTORY_MAPS.exists()
 
 PIL.Image.MAX_IMAGE_PIXELS = None
 
+
 class DurationLogger:
     def __init__(self, step: str):
         self.step = step
@@ -90,12 +91,12 @@ class OruxMap:
         print("===== ", self.map_name)
 
         # Remove zip file
-        filename_zip = self.directory_map.with_suffix('.zip')
+        filename_zip = self.directory_map.with_suffix(".zip")
         if filename_zip.exists():
             filename_zip.unlink()
 
         # Create empty directory
-        for filename in self.directory_map.glob('*.*'):
+        for filename in self.directory_map.glob("*.*"):
             filename.unlink()
         self.directory_map.mkdir(parents=True, exist_ok=True)
 
@@ -234,10 +235,10 @@ class MapScale:
             if False:
                 print(
                     tiff_images.filename.name,
-                    bounds_shrinkedCH1903.a.lon % self.layer_param.m_per_tile,
-                    bounds_shrinkedCH1903.a.lat % self.layer_param.m_per_tile,
-                    bounds_shrinkedCH1903.b.lon % self.layer_param.m_per_tile,
-                    bounds_shrinkedCH1903.b.lat % self.layer_param.m_per_tile,
+                    bounds_shrinkedCH1903.nw.lon_m % self.layer_param.m_per_tile,
+                    bounds_shrinkedCH1903.nw.lat_m % self.layer_param.m_per_tile,
+                    bounds_shrinkedCH1903.se.lon_m % self.layer_param.m_per_tile,
+                    bounds_shrinkedCH1903.se.lat_m % self.layer_param.m_per_tile,
                 )
 
         print(
@@ -264,10 +265,10 @@ class MapScale:
             yMax=height_pixel // self.layer_param.pixel_per_tile,
             height=height_pixel,
             width=width_pixel,
-            minLat=boundsWGS84.southEast.lat,
-            maxLat=boundsWGS84.northWest.lat,
-            minLon=boundsWGS84.northWest.lon,
-            maxLon=boundsWGS84.southEast.lon,
+            minLat=boundsWGS84.southEast.lat_m,
+            maxLat=boundsWGS84.northWest.lat_m,
+            minLon=boundsWGS84.northWest.lon_m,
+            maxLon=boundsWGS84.southEast.lon_m,
         )
 
     @property
@@ -346,12 +347,12 @@ class TiffImage:
             northwest_lat = t[3]
             self.m_per_pixel = t[1]
             assert t[1] == -t[5]
-            northwest = CH1903(lon=t[0], lat=t[3])
+            northwest = CH1903(lon_m=t[0], lat_m=t[3])
             southeast = CH1903(
-                lon=northwest.lon + pixel_lon * self.m_per_pixel,
-                lat=northwest.lat - pixel_lat * self.m_per_pixel,
+                lon_m=northwest.lon_m + pixel_lon * self.m_per_pixel,
+                lat_m=northwest.lat_m - pixel_lat * self.m_per_pixel,
             )
-            self.boundsCH1903 = BoundsCH1903(a=northwest, b=southeast)
+            self.boundsCH1903 = BoundsCH1903(nw=northwest, se=southeast)
 
         self.layer_param.verify_m_per_pixel(self)
         projection.assertSwissgridIsNorthWest(self.boundsCH1903)
@@ -432,8 +433,8 @@ class TiffImage:
         # We might not start at the top left -> We have to align the tiles
         # --> Offset pixel_x/pixel_y
         # --> Offset x, y
-        lon_offset_m = self.boundsCH1903.a.lon - self.scale.boundsCH1903_extrema.a.lon
-        lat_offset_m = self.boundsCH1903.a.lat - self.scale.boundsCH1903_extrema.a.lat
+        lon_offset_m = self.boundsCH1903.nw.lon_m - self.scale.boundsCH1903_extrema.nw.lon_m
+        lat_offset_m = self.boundsCH1903.nw.lat_m - self.scale.boundsCH1903_extrema.nw.lat_m
         # offset is typically positiv, but the first tile may be negative
         assert lon_offset_m >= -self.layer_param.m_per_tile
         # offset is typically negative, but the first tile may be positive
