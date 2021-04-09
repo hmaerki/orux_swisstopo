@@ -23,6 +23,9 @@ class CH1903:
         if valid_data:
             self.check()
 
+    def __repr__(self):
+        return f"CH1903({self.lon_m:0.1f}, {self.lat_m:0.1f})"
+
     def check(self):
         assert self.lon_m > CH1903.LON_OFFSET_M
         assert CH1903.LAT_OFFSET_OUTSIDE_M < self.lat_m < CH1903.LON_OFFSET_M
@@ -34,6 +37,18 @@ class CH1903:
     def plus(self, point: "CH1903") -> "CH1903":
         assert isinstance(point, CH1903)
         return CH1903(lon_m=self.lon_m + point.lon_m, lat_m=self.lat_m + point.lat_m)
+
+    def floor(self, floor_lon_m: float, floor_lat_m: float):
+        """
+        if floor_lon_x > 0: result will be smaller, else bigger
+          val   floor   result
+           22     10      10
+           22    -10      30
+        """
+        return CH1903(
+            lon_m=self.lon_m - (self.lon_m % floor_lon_m),
+            lat_m=self.lat_m - (self.lat_m % floor_lat_m),
+        )
 
     def to_WGS84(self) -> "WGS84":
         """
@@ -72,6 +87,9 @@ class BoundsCH1903:
         if valid_data:
             self.check()
 
+    def __repr__(self):
+        return f"BoundsCH1903(({self.nw.lon:0.1f},{self.nw.lat:0.1f}),({self.se.lon:0.1f},{self.se.lat:0.1f}))"
+
     def check(self):
         assert self.nw.lon_m < self.se.lon_m
         assert self.nw.lat_m > self.se.lat_m
@@ -105,24 +123,21 @@ class BoundsCH1903:
         assert isinstance(point, CH1903)
         return BoundsCH1903(nw=self.nw.plus(point), se=self.se.plus(point))
 
-    def shrink_tilesize_m(self, tile_size_m: float) -> "BoundsCH1903":
-        """Cut incomplete tiles from top, left, bottom and right"""
-        assert isinstance(tile_size_m, float)
-        self.nw.lon_m += -self.nw.lon_m % tile_size_m
-        self.se.lon_m -= self.se.lon_m % tile_size_m
-        self.nw.lat_m -= self.nw.lat_m % tile_size_m
-        self.se.lat_m += -self.se.lat_m % tile_size_m
-
     @property
     def csv(self) -> str:
-        return (
-            f"{self.nw.lon_m:0.1f},{self.nw.lat_m:0.1f},{self.se.lon_m:0.1f},{self.se.lat_m:0.1f}"
-        )
+        return f"{self.nw.lon_m:0.1f},{self.nw.lat_m:0.1f},{self.se.lon_m:0.1f},{self.se.lat_m:0.1f}"
         # return f"{self.nw.lon_m:0.1f},{self.se.lon_m:0.1f},{self.nw.lat_m:0.1f},{self.se.lat_m:0.1f}"
 
     @staticmethod
     def csv_header(name: str) -> str:
         return f"{name}.nw.lon_m,{name}.nw.lat_m,{name}.se.lon_m,{name}.se.lat_m"
+
+    def floor(self, floor_m):
+        """Cut incomplete tiles from top, left, bottom and right"""
+        return BoundsCH1903(
+            nw=self.nw.floor(floor_lon_m=-floor_m, floor_lat_m=floor_m),
+            se=self.se.floor(floor_lon_m=floor_m, floor_lat_m=-floor_m),
+        )
 
     def to_WGS84(self) -> "BoundsWGS84":
         northWest = self.nw.to_WGS84()
@@ -141,8 +156,12 @@ class BoundsCH1903:
 
 
 def create_boundsCH1903_extrema():
-    extrema_NW = CH1903(lon_m=CH1903.LON_OFFSET_M + 1.0, lat_m=CH1903.LON_OFFSET_M - 1.0)
-    extrema_SE = CH1903(lon_m=CH1903.LON_OFFSET_M * 2.0, lat_m=CH1903.LAT_OFFSET_M + 1.0)
+    extrema_NW = CH1903(
+        lon_m=CH1903.LON_OFFSET_M + 1.0, lat_m=CH1903.LON_OFFSET_M - 1.0
+    )
+    extrema_SE = CH1903(
+        lon_m=CH1903.LON_OFFSET_M * 2.0, lat_m=CH1903.LAT_OFFSET_M + 1.0
+    )
     return BoundsCH1903(nw=extrema_SE, se=extrema_NW, valid_data=False)
 
 

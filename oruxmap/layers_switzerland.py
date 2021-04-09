@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from oruxmap.utils.projection import CH1903
 
 
 @dataclass
@@ -9,7 +8,6 @@ class LayerParams:
     m_per_pixel: float
     tiff_filename: str = None
     tiff_url: str = None
-    align_CH1903: CH1903 = CH1903(lon_m=0.0, lat_m=0.0, valid_data=False)
 
     @property
     def name(self):
@@ -56,7 +54,6 @@ LIST_LAYERS = (
         scale=200,
         orux_layer=12,
         m_per_pixel=10.0,
-        align_CH1903=CH1903(lon_m=3000.0, lat_m=2000.0, valid_data=False),
     ),
     LayerParams(scale=100, orux_layer=13, m_per_pixel=5.0),
     LayerParams(scale=50, orux_layer=14, m_per_pixel=2.5),

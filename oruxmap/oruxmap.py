@@ -122,16 +122,18 @@ class OruxMap:
 
         with DurationLogger("sqlite.execute('VACUUM')") as duration:
             self.db.commit()
-            self.db.execute("VACUUM")
+            if not self.context.skip_sqlite_vacuum:
+                self.db.execute("VACUUM")
             self.db.close()
 
-        with DurationLogger("zip") as duration:
-            filename_zip = shutil.make_archive(
-                base_name=str(self.directory_map),
-                root_dir=str(self.directory_map.parent),
-                base_dir=self.directory_map.name,
-                format="zip",
-            )
+        if not self.context.skip_map_zip:
+            with DurationLogger("zip") as duration:
+                filename_zip = shutil.make_archive(
+                    base_name=str(self.directory_map),
+                    root_dir=str(self.directory_map.parent),
+                    base_dir=self.directory_map.name,
+                    format="zip",
+                )
         print("----- Ready")
         print(
             f'The map now is ready in "{self.directory_map.relative_to(DIRECTORY_BASE)}".'
@@ -224,22 +226,9 @@ class MapScale:
         self.boundsCH1903_extrema = create_boundsCH1903_extrema()
         for tiff_images in self.imageTiffs:
             # Align the tiff and shrink it to complete tiles
-            bounds_shrinkedCH1903 = tiff_images.boundsCH1903.minus(
-                self.layer_param.align_CH1903
-            )
-            bounds_shrinkedCH1903.shrink_tilesize_m(self.layer_param.m_per_tile)
-            bounds_shrinkedCH1903 = bounds_shrinkedCH1903.plus(
-                self.layer_param.align_CH1903
-            )
-            self.boundsCH1903_extrema.extend(bounds_shrinkedCH1903)
-            if False:
-                print(
-                    tiff_images.filename.name,
-                    bounds_shrinkedCH1903.nw.lon_m % self.layer_param.m_per_tile,
-                    bounds_shrinkedCH1903.nw.lat_m % self.layer_param.m_per_tile,
-                    bounds_shrinkedCH1903.se.lon_m % self.layer_param.m_per_tile,
-                    bounds_shrinkedCH1903.se.lat_m % self.layer_param.m_per_tile,
-                )
+            # lat_m = tiff_images.boundsCH1903_floor.a.lat % layer_param.m_per_tile
+            # lon_m = tiff_images.boundsCH1903_floor.a.lon % layer_param.m_per_tile
+            self.boundsCH1903_extrema.extend(tiff_images.boundsCH1903_floor)
 
         print(
             f"{self.layer_param.scale}: {len(self.imageTiffs)}tif {self.boundsCH1903_extrema.lon_m/1000.0:0.3f}x{self.boundsCH1903_extrema.lat_m/1000.0:0.3f}km"
@@ -353,6 +342,9 @@ class TiffImage:
                 lat_m=northwest.lat_m - pixel_lat * self.m_per_pixel,
             )
             self.boundsCH1903 = BoundsCH1903(nw=northwest, se=southeast)
+            self.boundsCH1903_floor = self.boundsCH1903.floor(
+                self.layer_param.m_per_tile
+            )
 
         self.layer_param.verify_m_per_pixel(self)
         projection.assertSwissgridIsNorthWest(self.boundsCH1903)
@@ -430,15 +422,14 @@ class TiffImage:
         self._create_tiles2(label)
 
     def _create_tiles2(self, label):
-        # We might not start at the top left -> We have to align the tiles
-        # --> Offset pixel_x/pixel_y
-        # --> Offset x, y
-        lon_offset_m = self.boundsCH1903.nw.lon_m - self.scale.boundsCH1903_extrema.nw.lon_m
-        lat_offset_m = self.boundsCH1903.nw.lat_m - self.scale.boundsCH1903_extrema.nw.lat_m
-        # offset is typically positiv, but the first tile may be negative
-        assert lon_offset_m >= -self.layer_param.m_per_tile
-        # offset is typically negative, but the first tile may be positive
-        assert lat_offset_m <= self.layer_param.m_per_tile
+        lon_offset_m = (
+            self.boundsCH1903.nw.lon_m - self.scale.boundsCH1903_extrema.nw.lon_m
+        )
+        lat_offset_m = (
+            self.boundsCH1903.nw.lat_m - self.scale.boundsCH1903_extrema.nw.lat_m
+        )
+        assert lon_offset_m >= 0
+        assert lat_offset_m <= 0
 
         x_offset_tile = int(lon_offset_m / self.layer_param.m_per_tile)
         y_offset_tile = int(-lat_offset_m / self.layer_param.m_per_tile)

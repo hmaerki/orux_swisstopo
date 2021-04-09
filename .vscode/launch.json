@@ -14,7 +14,8 @@
         "--rcfile=${workspaceFolder}/.pylintrc",
         "--verbose",
         "*.py",
-        "oruxmap"
+        "oruxmap",
+        "oruxmap/utils"
       ],
       "console": "integratedTerminal"
     },
