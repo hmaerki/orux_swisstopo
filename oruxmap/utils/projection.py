@@ -30,6 +30,11 @@ class CH1903:
         assert self.lon_m > CH1903.LON_OFFSET_M
         assert CH1903.LAT_OFFSET_OUTSIDE_M < self.lat_m < CH1903.LON_OFFSET_M
 
+    @property
+    def _iter_value(self):
+        yield self.lon_m
+        yield self.lat_m
+
     def minus(self, point: "CH1903") -> "CH1903":
         assert isinstance(point, CH1903)
         return CH1903(lon_m=self.lon_m - point.lon_m, lat_m=self.lat_m - point.lat_m)
@@ -88,7 +93,7 @@ class BoundsCH1903:
             self.check()
 
     def __repr__(self):
-        return f"BoundsCH1903(({self.nw.lon:0.1f},{self.nw.lat:0.1f}),({self.se.lon:0.1f},{self.se.lat:0.1f}))"
+        return f"BoundsCH1903(({self.nw.lon_m:0.1f},{self.nw.lat_m:0.1f}),({self.se.lon_m:0.1f},{self.se.lat_m:0.1f}))"
 
     def check(self):
         assert self.nw.lon_m < self.se.lon_m
@@ -114,6 +119,18 @@ class BoundsCH1903:
         v = self.nw.lat_m - self.se.lat_m
         assert v > 0.0
         return v
+
+    @property
+    def _iter_value(self):
+        yield from self.nw._iter_value
+        yield from self.se._iter_value
+
+    def equals(self, bounds: 'BoundsCH1903', tolerance_m=0.05) -> bool:
+        assert isinstance(bounds, BoundsCH1903)
+        for a, b in zip(self._iter_value, bounds._iter_value):
+            if abs(a-b) > tolerance_m:
+                return False
+        return True
 
     def minus(self, point: CH1903) -> "BoundsCH1903":
         assert isinstance(point, CH1903)
