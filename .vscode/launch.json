@@ -1,0 +1,65 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Lint",
+      "type": "python",
+      "request": "launch",
+      "module": "pylint",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--rcfile=${workspaceFolder}/.pylintrc",
+        "--verbose",
+        "*.py",
+        "oruxmap",
+        "oruxmap/utils"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Black",
+      "type": "python",
+      "request": "launch",
+      "module": "black",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--config",
+        "${workspaceFolder}/.blackconfig.yaml",
+        "*.py",
+        "oruxmap/*.py",
+        "oruxmap/utils/*.py"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: test_unpickle.py",
+      "type": "python",
+      "request": "launch",
+      "module": "oruxmap.test_unpickle"
+    },
+    {
+      "name": "Python: create_map_CH_samples.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/create_map_CH_samples.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: create_map_CH_SwissTopo.py",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/create_map_CH_SwissTopo.py",
+      "console": "integratedTerminal"
+    }
+  ]
+}
