@@ -2,19 +2,22 @@
 
 from oruxmap.utils.context import Context
 
-# from oruxmap.utils.constants_switzerland import tiffs_wetzikon,
 from oruxmap.oruxmap import OruxMap
 
 context = Context()
 # context.skip_optimize_png = True
+# from oruxmap.utils.constants_switzerland import tiffs_wetzikon,
 # context.only_tiffs = tiffs_wetzikon
 # context.only_tiles_border = 5
 # context.only_tiles_modulo = 10
 # context.skip_tiff_read = True
 # context.skip_png_write = True
 
-with OruxMap(f"CH_SwissTopo25k_up", context=context) as oruxmap:
-    oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
+if __name__ == "__main__":
+    with OruxMap(f"CH_SwissTopo", context=context) as oruxmap:
+        oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
 
-with OruxMap(f"CH_SwissTopo10k", context=context) as oruxmap:
-    oruxmap.create_layers(iMasstabMin=10, iMasstabMax=10)
+    if False:
+        # The maps in 10k scale take up a few hundred gigabytes
+        with OruxMap(f"CH_SwissTopo10k", context=context) as oruxmap:
+            oruxmap.create_layers(iMasstabMin=10, iMasstabMax=10)

@@ -23,13 +23,13 @@ def get_contextB():
     context.skip_optimize_png = True
     return context
 
+if __name__ == "__main__":
+    for context in (
+        get_contextA(),
+        get_contextB(),
+    ):
+        with OruxMap("CH_samples_25k_up", context=context) as oruxmap:
+            oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
 
-for context in (
-    get_contextA(),
-    get_contextB(),
-):
-    with OruxMap("CH_samples_25k_up", context=context) as oruxmap:
-        oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
-
-    with OruxMap("CH_samples_10k", context=context) as oruxmap:
-        oruxmap.create_layers(iMasstabMin=10, iMasstabMax=10)
+        with OruxMap("CH_samples_10k", context=context) as oruxmap:
+            oruxmap.create_layers(iMasstabMin=10, iMasstabMax=10)

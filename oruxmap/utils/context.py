@@ -13,7 +13,7 @@ class Context:
     only_tiles_modulo: int = None
     skip_sqlite_vacuum: bool = True
     skip_map_zip: bool = True
-    multiprocessing: bool = False
+    multiprocessing: bool = True
     save_diskspace: bool = False
 
     def skip_count(self, count) -> int:

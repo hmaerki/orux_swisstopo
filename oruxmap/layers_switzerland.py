@@ -18,9 +18,9 @@ class LayerParams:
     def m_per_tile(self) -> float:
         return self.pixel_per_tile * self.m_per_pixel
 
-    def verify_m_per_pixel(self, tiff_images: "TiffImage"):
-        assert tiff_images.__class__.__name__ == "TiffImage"
-        assert abs((tiff_images.m_per_pixel / self.m_per_pixel) - 1.0) < 0.001
+    def verify_m_per_pixel(self, m_per_pixel: float):
+        assert isinstance(m_per_pixel, float)
+        assert abs((m_per_pixel / self.m_per_pixel) - 1.0) < 0.001
 
 
 LIST_LAYERS = (
