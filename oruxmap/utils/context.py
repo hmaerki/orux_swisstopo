@@ -11,8 +11,8 @@ class Context:
     only_tiffs: List[str] = None
     only_tiles_border: int = None
     only_tiles_modulo: int = None
-    skip_sqlite_vacuum: bool = True
-    skip_map_zip: bool = True
+    skip_sqlite_vacuum: bool = False
+    skip_map_zip: bool = False
     multiprocessing: bool = True
     save_diskspace: bool = False
 

@@ -152,7 +152,7 @@ class OruxMap:
             f'The map now is ready in "{self.directory_map.relative_to(DIRECTORY_BASE)}".'
         )
         print(
-            "This directory must be copied 'by Hans' onto your android into 'oruxmaps/mapfiles'."
+            "This directory must be copied 'by Hand' onto your android into 'oruxmaps/mapfiles'."
         )
 
     def create_layers(self, iMasstabMin: int = 25, iMasstabMax: int = 500):
