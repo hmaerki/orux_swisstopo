@@ -43,8 +43,6 @@ LIST_LAYERS = (
     LayerParams(
         scale=500,
         orux_layer=11,
-        tiff_url="https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/data.zip",
-        tiff_filename="SMR500_KREL.tif",
         m_per_pixel=25.0,
     ),
     LayerParams(
