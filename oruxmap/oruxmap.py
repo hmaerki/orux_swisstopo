@@ -194,6 +194,10 @@ class DebugLogger:
         assert isinstance(list_tiff_attrs, list)
         assert isinstance(boundsCH1903_extrema, BoundsCH1903)
 
+        boundsCH1903_extrema.assertIsNorthWest()
+        for tiff_attrs in list_tiff_attrs:
+            tiff_attrs.boundsCH1903.assertIsNorthWest()
+
         def fopen(extension):
             filename_base = f"debug_log_{self.map_scale.layer_param.name}"
             filename = DIRECTORY_LOGS / (filename_base + extension)
@@ -361,8 +365,12 @@ class MapScale:
                 boundsCH1903_extrema.extend(tiff_attrs.boundsCH1903_floor)
 
             print(
-                f"{self.layer_param.scale}: {len(list_tiff_attrs)}tifs {boundsCH1903_extrema.lon_m/1000.0:0.3f}x{boundsCH1903_extrema.lat_m/1000.0:0.3f}km"
+                f"{self.layer_param.scale}: {len(list_tiff_attrs)}tifs {boundsCH1903_extrema.lon_m/1000.0:0.0f}x{boundsCH1903_extrema.lat_m/1000.0:0.0f}km"
             )
+
+            boundsCH1903_extrema.assertIsNorthWest()
+
+            boundsWGS84 = boundsCH1903_extrema.to_WGS84(valid_data=self.layer_param.valid_data)
 
             width_pixel = int(boundsCH1903_extrema.lon_m / self.layer_param.m_per_pixel)
             height_pixel = int(
@@ -370,8 +378,6 @@ class MapScale:
             )
             # assert width_pixel % self.layer_param.pixel_per_tile == 0
             # assert height_pixel % self.layer_param.pixel_per_tile == 0
-
-            boundsWGS84 = boundsCH1903_extrema.to_WGS84()
 
             self.orux_maps.xml_otrk2.write_layer(
                 calib=boundsWGS84,
@@ -382,10 +388,10 @@ class MapScale:
                 yMax=height_pixel // self.layer_param.pixel_per_tile,
                 height=height_pixel,
                 width=width_pixel,
-                minLat=boundsWGS84.southEast.lat_m,
-                maxLat=boundsWGS84.northWest.lat_m,
-                minLon=boundsWGS84.northWest.lon_m,
-                maxLon=boundsWGS84.southEast.lon_m,
+                minLat=boundsWGS84.southEast.lat_deg,
+                maxLat=boundsWGS84.northWest.lat_deg,
+                minLon=boundsWGS84.northWest.lon_deg,
+                maxLon=boundsWGS84.southEast.lon_deg,
             )
 
             for tiff_attrs in list_tiff_attrs:
@@ -464,19 +470,27 @@ class TiffImageAttributes:
                 )
 
             t = dataset.get_transform()
-            northwest_lon = t[0]
-            northwest_lat = t[3]
+            northwest_lon_m = t[0]
+            northwest_lat_m = t[3]
             m_per_pixel = t[1]
             assert t[1] == -t[5]
-            northwest = CH1903(lon_m=t[0], lat_m=t[3])
+
+            northwest = CH1903(
+                lon_m=northwest_lon_m,
+                lat_m=northwest_lat_m,
+                valid_data=layer_param.valid_data,
+            )
             southeast = CH1903(
                 lon_m=northwest.lon_m + pixel_lon * m_per_pixel,
                 lat_m=northwest.lat_m - pixel_lat * m_per_pixel,
+                valid_data=layer_param.valid_data,
             )
             boundsCH1903 = BoundsCH1903(nw=northwest, se=southeast)
+            boundsCH1903.assertIsNorthWest()
             boundsCH1903_floor = boundsCH1903.floor(
-                floor_m=layer_param.m_per_tile,
+                floor_m=layer_param.m_per_tile, valid_data=layer_param.valid_data
             )
+            boundsCH1903_floor.assertIsNorthWest()
             if not boundsCH1903.equals(boundsCH1903_floor):
                 print(f"{filename.relative_to(DIRECTORY_BASE)}: cropped")
 

@@ -39,10 +39,10 @@ class OruxXmlOtrk2:
         self.f.write(TEMPLATE_LAYER_BEGIN.format(**params))
 
         for strPoint, lon_m, lat_m in (
-            ("TL", calib.northWest.lon_m, calib.northWest.lat_m),
-            ("BR", calib.southEast.lon_m, calib.southEast.lat_m),
-            ("TR", calib.northEast.lon_m, calib.northEast.lat_m),
-            ("BL", calib.southWest.lon_m, calib.southWest.lat_m),
+            ("TL", calib.northWest.lon_deg, calib.northWest.lat_deg),
+            ("BR", calib.southEast.lon_deg, calib.southEast.lat_deg),
+            ("TR", calib.northEast.lon_deg, calib.northEast.lat_deg),
+            ("BL", calib.southWest.lon_deg, calib.southWest.lat_deg),
         ):
             self.f.write(
                 f'          <CalibrationPoint corner="{strPoint}" lon="{lon_m:2.6f}" lat="{lat_m:2.6f}" />\n'

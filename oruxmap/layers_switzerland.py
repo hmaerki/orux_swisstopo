@@ -22,6 +22,11 @@ class LayerParams:
         assert isinstance(m_per_pixel, float)
         assert abs((m_per_pixel / self.m_per_pixel) - 1.0) < 0.001
 
+    @property
+    def valid_data(self) -> bool:
+        # The 1:1Mio maps (50 m_per_pixel) has extremely large
+        return self.m_per_pixel < 24
+
 
 LIST_LAYERS = (
     # LayerParams(

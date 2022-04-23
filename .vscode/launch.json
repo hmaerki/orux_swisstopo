@@ -52,7 +52,8 @@
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/create_map_CH_samples.py",
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "justMyCode": false
     },
     {
       "name": "Python: create_map_CH_SwissTopo.py",

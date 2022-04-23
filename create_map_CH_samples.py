@@ -21,6 +21,7 @@ def get_contextA():
 def get_contextB():
     context = get_contextA()
     context.skip_optimize_png = True
+    # context.multiprocessing = False
     return context
 
 if __name__ == "__main__":
