@@ -370,7 +370,9 @@ class MapScale:
 
             boundsCH1903_extrema.assertIsNorthWest()
 
-            boundsWGS84 = boundsCH1903_extrema.to_WGS84(valid_data=self.layer_param.valid_data)
+            boundsWGS84 = boundsCH1903_extrema.to_WGS84(
+                valid_data=self.layer_param.valid_data
+            )
 
             width_pixel = int(boundsCH1903_extrema.lon_m / self.layer_param.m_per_pixel)
             height_pixel = int(

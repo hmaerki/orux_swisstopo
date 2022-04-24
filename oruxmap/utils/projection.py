@@ -94,8 +94,8 @@ class CH1903:
         E entspricht Lambda (8.x), y (7xx)
         N entspricht Phi (46.x), x (2xx)
         """
-        lon_m = self.lon_m - CH1903.LON_OFFSET_M # x
-        lat_m = self.lat_m - CH1903.LAT_OFFSET_M # y
+        lon_m = self.lon_m - CH1903.LON_OFFSET_M
+        lat_m = self.lat_m - CH1903.LAT_OFFSET_M
 
         y = (lon_m - CH1903.LON_BERN_M) / 1_000_000.0
         x = (lat_m - CH1903.LAT_BERN_M) / 1_000_000.0
@@ -218,16 +218,14 @@ class BoundsCH1903:
             southEast=southEast,
         )
 
+
 MAX_M = 100_000_000.0
 MIN_M = -MAX_M
 
+
 def create_boundsCH1903_extrema():
-    extrema_NW = CH1903(
-        lon_m=MAX_M, lat_m=MIN_M, valid_data=False
-    )
-    extrema_SE = CH1903(
-        lon_m=MIN_M, lat_m=MAX_M, valid_data=False
-    )
+    extrema_NW = CH1903(lon_m=MAX_M, lat_m=MIN_M, valid_data=False)
+    extrema_SE = CH1903(lon_m=MIN_M, lat_m=MAX_M, valid_data=False)
     return BoundsCH1903(nw=extrema_NW, se=extrema_SE, valid_data=False)
 
     # extrema_NW = CH1903(
