@@ -12,6 +12,7 @@ context = Context()
 # context.only_tiles_modulo = 10
 # context.skip_tiff_read = True
 # context.skip_png_write = True
+context.multiprocessing = False
 
 if __name__ == "__main__":
     with OruxMap(f"CH_SwissTopo", context=context) as oruxmap:

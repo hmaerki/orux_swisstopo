@@ -45,12 +45,11 @@ LIST_LAYERS = (
         tiff_filename="SMR1000_KREL.tif",
         m_per_pixel=50.0,
     ),
-    LayerParams(
-        scale=500,
-        orux_layer=11,
-        m_per_pixel=25.0,
-    ),
-    LayerParams(scale=200, orux_layer=12, m_per_pixel=10.0, pixel_per_tile=100),
+    LayerParams(scale=500, orux_layer=11, m_per_pixel=25.0),
+    # Below line will result in bug as the maps are not aligned to 400px
+    LayerParams(scale=200, orux_layer=12, m_per_pixel=10.0),
+    # Below line will create a pattern: (tile,empty,empty,emtpy) whe combinde with outer layers
+    # LayerParams(scale=200, orux_layer=12, m_per_pixel=10.0, pixel_per_tile=100),
     LayerParams(scale=100, orux_layer=13, m_per_pixel=5.0),
     LayerParams(scale=50, orux_layer=14, m_per_pixel=2.5),
     LayerParams(scale=25, orux_layer=15, m_per_pixel=1.25),

@@ -1,7 +1,7 @@
 import pathlib
 from oruxmap.utils.projection import BoundsWGS84
 
-TEMPLATE_LAYER_BEGIN = """    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="2.1">
+TEMPLATE_LAYER_BEGIN = """    <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="3.0">
       <MapCalibration layers="false" layerLevel="{id}">
         <MapName><![CDATA[{map_name} {id:d}]]></MapName>
         <MapChunks xMax="{xMax}" yMax="{yMax}" datum="CH-1903:Swiss@WGS 1984:Global Definition" projection="(SUI) Swiss Grid" img_height="{TILE_SIZE}" img_width="{TILE_SIZE}" file_name="{map_name}" />
@@ -18,7 +18,7 @@ TEMPLATE_LAYER_END = """        </CalibrationPoints>
 
 TEMPLATE_MAIN_START = """<?xml version="1.0" encoding="UTF-8"?>
 <OruxTracker xmlns="http://oruxtracker.com/app/res/calibration" versionCode="3.0">
-  <MapCalibration layers="true" layerLevel="0">
+  <MapCalibration layers="false" layerLevel="0">
     <MapName><![CDATA[{map_name}]]></MapName>
 """
 
