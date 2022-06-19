@@ -56,18 +56,22 @@ class _SqliteTilesBase:
 
         self.db.execute("pragma journal_mode=OFF")
         self.db.execute(
-            """CREATE TABLE tiles (east_m int, north_m int, image blob, PRIMARY KEY (east_m, north_m))"""
+            """CREATE TABLE tiles (nw_east_m int, nw_north_m int, image blob, PRIMARY KEY (nw_east_m, nw_north_m))"""
         )
 
     def add_subtile(
-        self, img: PIL.Image.Image, east_m: int, north_m: int, skip_optimize_png=False
+        self,
+        img: PIL.Image.Image,
+        nw_east_m: int,
+        nw_north_m: int,
+        skip_optimize_png=False,
     ) -> None:
         b = sqlite3.Binary(self._tobytes(img=img, skip_optimize_png=skip_optimize_png))
         self.db.execute(
             "insert into tiles values (?,?,?)",
             (
-                east_m,
-                north_m,
+                nw_east_m,
+                nw_north_m,
                 b,
             ),
         )
@@ -84,7 +88,7 @@ class _SqliteTilesBase:
     def select(self, where: str, order: str, raw=False):
         c = self.db.cursor()
         c.execute(
-            f"select east_m, north_m, image from tiles where {where} order by {order}"
+            f"select nw_east_m, nw_north_m, image from tiles where {where} order by {order}"
         )
         for row in c:
             img = row[2]

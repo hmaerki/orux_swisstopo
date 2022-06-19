@@ -1,0 +1,5 @@
+/home/maerki/work_orux_swisstopo/orux_swisstopo/target/cache_tif/0100/swiss-map-raster100_2013_33_komb_5_2056.tif
+  x_pixel=0
+  y_pixel=0
+  nw_east_m=2690000
+  nw_north_m=1254000

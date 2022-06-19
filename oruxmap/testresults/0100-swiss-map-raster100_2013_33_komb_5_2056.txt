@@ -1,0 +1,12 @@
+target/cache_tif/0100/swiss-map-raster100_2013_33_komb_5_2056.tif
+  boundsCH1903.nw.lon_m=2690000.0
+  boundsCH1903.nw.lat_m=1254000.0
+  boundsCH1903.se.lon_m=2760000.0
+  boundsCH1903.se.lat_m=1206000.0
+  scale=100
+  m_per_pixel=5.0
+  m_per_tile=5000.0
+  m_per_subtile=500.0
+  pixel_per_tile=1000
+  pixel_per_subtile=100
+  scale=100
