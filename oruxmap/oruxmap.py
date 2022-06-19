@@ -51,10 +51,9 @@ from oruxmap.utils.context import Context
 from oruxmap.utils.orux_xml_otrk2 import OruxXmlOtrk2
 from oruxmap.utils.download_zip_and_extract import DownloadZipAndExtractTiff
 from oruxmap.layers_switzerland import LIST_LAYERS, LayerParams
-from oruxmap.utils.img_png import extract_tile, convert_to_png_raw
+from oruxmap.utils.img_png import convert_to_png_raw
 from oruxmap.utils.sqlite_titles import SqliteTilesPng, SqliteTilesRaw
 from oruxmap.utils.constants_directories import (
-    DIRECTORY_CACHE_PNG,
     DIRECTORY_MAPS,
     DIRECTORY_BASE,
     DIRECTORY_RESOURCES,
@@ -161,9 +160,9 @@ class OruxMap:
 
     def _create_layer(self, layer_param):
         map_scale = MapScale(self, layer_param)
-        map_scale.create_boundsCH1903_pickle()
+        map_scale.sqlite_fill_subtiles()
         # map_scale.create_png_pickle()
-        map_scale.subtiles_to_tiles()
+        map_scale.sqlite_subtiles_to_tiles()
         map_scale.create_map()
 
 
@@ -216,39 +215,6 @@ class DebugLogger:
         #     for tiff_filename, tiff_boundsCH1903 in list_filename_boundsCH1903:
         #         for debug_png in tiff_image.debug_pngs:
         #             f.write(f"{debug_png.csv},{tiff_image.boundsCH1903.csv}\n")
-
-
-# TODO(hans) remove
-@dataclass
-class CacheTiffBoundsCH1903:
-    layer_param: LayerParams
-    context: Context
-
-    @property
-    def filename(self):
-        return (
-            directory_png_cache(layer_param=self.layer_param, context=self.context)
-            / f"list_filename_boundsCH1903.pickle"
-        )
-
-    def _check(self, list_attrs):
-        for attrs in list_attrs:
-            assert isinstance(attrs, TiffImageAttributes)
-
-    def dump(self, list_attrs: list):
-        # TODO(hans): remove
-        self.filename.parent.mkdir(parents=True, exist_ok=True)
-        self._check(list_attrs=list_attrs)
-        with self.filename.open("wb") as f:
-            pickle.dump(list_attrs, f)
-
-    def load(self) -> list:
-        # TODO(hans): remove
-        with self.filename.open("rb") as f:
-            list_attrs = pickle.load(f)
-            self._check(list_attrs=list_attrs)
-            return list_attrs
-
 
 @dataclass
 class _Subtiles:
@@ -330,21 +296,10 @@ class MapScale:
             / self.layer_param.name
         )
         return filebase.with_suffix(".db")
-        # filebase = DIRECTORY_CACHE_TILES / self.orux_maps.context.append_version(f"{self.layer_param.name}_{db_name}")
-        # return filebase.with_suffix(".db")
 
-    # TODO(hans): rename
-    def create_boundsCH1903_pickle(self):
+    def sqlite_fill_subtiles(self):
         if self.filename_subtiles_sqlite.exists():
             return
-
-        # TODO(hans) remove
-        if False:
-            c = CacheTiffBoundsCH1903(
-                layer_param=self.layer_param, context=self.orux_maps.context
-            )
-            if c.filename.exists():
-                return
 
         def iter_download_tiffs(filename_url_tiffs):
             assert filename_url_tiffs.exists()
@@ -405,118 +360,8 @@ class MapScale:
                 )
                 tiff_image_converter.create_subtiles(db=db)
 
-        # TODO(hans): remove rest
-        return
-        # TODO(hans): remove 'tiff_image_attributes'
-        tiff_image_attributes = []
-        for filename in iter_filename_tiff():
-            tiff_attributes = TiffImageAttributes.create(
-                layer_param=self.layer_param,
-                filename=filename,
-            )
-            tiff_image_attributes.append(tiff_attributes)
 
-        if len(tiff_image_attributes) == 0:
-            raise Exception(
-                f"No valid tiff for this scale {self.layer_param.scale} found"
-            )
-
-        # TODO(hans): remove 'verify_m_per_pixel'
-        for tiff in tiff_image_attributes:
-            self.layer_param.verify_m_per_pixel(tiff.m_per_pixel)
-
-        c.dump(list_attrs=tiff_image_attributes)
-
-    # TODO(hans): remove
-    def create_png_pickle(self):
-        """
-        This takes all tiffs for one scale and creates for each tiff a pickle file with all pngs
-        """
-        c = CacheTiffBoundsCH1903(
-            layer_param=self.layer_param, context=self.orux_maps.context
-        )
-        assert c.filename.exists()
-        list_tiff_attrs = c.load()
-
-        arguments = [
-            dict(
-                context=self.orux_maps.context,
-                tiff_attrs=tiff_attrs,
-                i=i,
-                total=len(list_tiff_attrs),
-            )
-            for i, tiff_attrs in enumerate(list_tiff_attrs)
-        ]
-
-        if self.orux_maps.context.multiprocessing:
-            with Pool(8) as p:
-                p.map(multiprocess_create_tiles2, arguments, chunksize=1)
-            return
-        for args in arguments:
-            multiprocess_create_tiles(**args)
-
-    # TODO(hans): remove
-    def create_map_obsolete(self):
-        if not self.orux_maps.context.skip_tiff_read:
-            c = CacheTiffBoundsCH1903(
-                layer_param=self.layer_param, context=self.orux_maps.context
-            )
-            assert c.filename.exists()
-            list_tiff_attrs = c.load()
-
-            boundsCH1903_extrema = create_boundsCH1903_extrema()
-            for tiff_attrs in list_tiff_attrs:
-                # Align the tiff and shrink it to complete tiles
-                # lat_m = tiff_images.boundsCH1903_floor.a.lat % layer_param.m_per_tile
-                # lon_m = tiff_images.boundsCH1903_floor.a.lon % layer_param.m_per_tile
-                boundsCH1903_extrema.extend(tiff_attrs.boundsCH1903_floor)
-
-            print(
-                f"{self.layer_param.scale}: {len(list_tiff_attrs)}tifs {boundsCH1903_extrema.lon_m/1000.0:0.0f}x{boundsCH1903_extrema.lat_m/1000.0:0.0f}km"
-            )
-
-            boundsCH1903_extrema.assertIsNorthWest()
-
-            boundsWGS84 = boundsCH1903_extrema.to_WGS84(
-                valid_data=self.layer_param.valid_data
-            )
-
-            width_pixel = int(boundsCH1903_extrema.lon_m / self.layer_param.m_per_pixel)
-            height_pixel = int(
-                boundsCH1903_extrema.lat_m / self.layer_param.m_per_pixel
-            )
-            # assert width_pixel % self.layer_param.pixel_per_tile == 0
-            # assert height_pixel % self.layer_param.pixel_per_tile == 0
-
-            self.orux_maps.xml_otrk2.write_layer(
-                calib=boundsWGS84,
-                TILE_SIZE=self.layer_param.pixel_per_tile,
-                map_name=self.orux_maps.map_name,
-                id=self.layer_param.orux_layer,
-                xMax=width_pixel // self.layer_param.pixel_per_tile,
-                yMax=height_pixel // self.layer_param.pixel_per_tile,
-                height=height_pixel,
-                width=width_pixel,
-                minLat=boundsWGS84.southEast.lat_deg,
-                maxLat=boundsWGS84.northWest.lat_deg,
-                minLon=boundsWGS84.northWest.lon_deg,
-                maxLon=boundsWGS84.southEast.lon_deg,
-            )
-
-            for tiff_attrs in list_tiff_attrs:
-                tiff_image_converter = TiffImageConverter(
-                    context=self.orux_maps.context,
-                    tiff_attrs=tiff_attrs,
-                )
-                tiff_image_converter.append_sqlite(
-                    db=self.orux_maps.db, boundsCH1903_extrema=boundsCH1903_extrema
-                )
-
-        self.debug_logger.report(
-            list_tiff_attrs=list_tiff_attrs, boundsCH1903_extrema=boundsCH1903_extrema
-        )
-
-    def subtiles_to_tiles(self):
+    def sqlite_subtiles_to_tiles(self):
         if self.filename_tiles_sqlite.exists():
             return
 
@@ -685,70 +530,13 @@ class MapScale:
                     ),
                 )
 
-            # def append_sqlite(
-            #     self, db, boundsCH1903_extrema
-            # ):  # pylint: disable=too-many-statements,too-many-branches
-            # lon_offset_m = tiff_cache.nw.lon_m - boundsCH1903_extrema.nw.lon_m
-            # lat_offset_m = boundsCH1903_extrema.nw.lat_m - tiff_cache.nw.lat_m
-            # lon_offset_m = round(lon_offset_m)
-            # lat_offset_m = round(lat_offset_m)
-            # assert lon_offset_m >= 0
-            # assert lat_offset_m >= 0
-
-            # x_tile_offset = round(lon_offset_m // self.layer_param.m_per_tile)
-            # y_tile_offset = round(lat_offset_m // self.layer_param.m_per_tile)
-            # assert x_tile_offset >= 0
-            # assert y_tile_offset >= 0
-
-            # for png in tiff_cache.list_png:
-            #     b = sqlite3.Binary(png.raw_png)
-            #     db.execute(
-            #         "insert or replace into tiles values (?,?,?,?)",
-            #         (
-            #             png.x_tile + x_tile_offset,
-            #             png.y_tile + y_tile_offset,
-            #             tiff_cache.orux_layer,
-            #             b,
-            #         ),
-            #     )
-
-            # ---------------------
-            # for tiff_attrs in list_tiff_attrs:
-            #     tiff_image_converter = TiffImageConverter(
-            #         context=self.orux_maps.context,
-            #         tiff_attrs=tiff_attrs,
-            #     )
-            #     tiff_image_converter.append_sqlite(
-            #         db=self.orux_maps.db, boundsCH1903_extrema=boundsCH1903_extrema
-            #     )
-
-            # self.debug_logger.report(
-            #     list_tiff_attrs=list_tiff_attrs, boundsCH1903_extrema=boundsCH1903_extrema
-            # )
-
-
-def multiprocess_create_tiles2(argument):
-    multiprocess_create_tiles(**argument)
-
-
-# TODO(hans): remove
-def multiprocess_create_tiles(context, tiff_attrs, i, total):
-    assert isinstance(context, Context)
-    assert isinstance(tiff_attrs, TiffImageAttributes)
-    assert isinstance(i, int)
-    assert isinstance(total, int)
-    label = f"{tiff_attrs.filename.relative_to(DIRECTORY_BASE)} {i+1}({total})"
-    tiff_image_converter = TiffImageConverter(context=context, tiff_attrs=tiff_attrs)
-    tiff_image_converter.create_tiles(label=label)
-
-
 @dataclass
 class PngCache:
     x_tile: int
     y_tile: int
     raw_png: bytes
 
-
+# TODO(hans): remove?
 @dataclass
 class TiffCache:
     list_png: list
@@ -767,6 +555,7 @@ class TiffCache:
         self.list_png.append(png_cache)
 
 
+# TODO(hans): remove?
 @dataclass
 class TiffImageAttributes:
     filename: pathlib.Path
@@ -827,7 +616,7 @@ class TiffImageAttributes:
             boundsCH1903_floor=boundsCH1903_floor,
         )
 
-
+# TODO(hans): remove?
 class TiffImageConverter:
     def __init__(self, context, tiff_attrs):
         assert isinstance(context, Context)
@@ -892,104 +681,10 @@ class TiffImageConverter:
                     )
                     db.add_subtile(img=img_subtile, east_m=east_m, north_m=north_m)
 
-    # TODO(hans): remove
-    def create_tiles(self, label):
-        if self._filename_pickle_png_cache.exists():
-            # The tile have already been created
-            return
-        self._filename_pickle_png_cache.parent.mkdir(exist_ok=True, parents=True)
-        if self.context.save_diskspace:
-            self.filename.unlink()
-
-        self._create_tiles2(label)
-
-    # TODO(hans): remove
-    def _create_tiles2(self, label):
-        lon_offset_m = round(
-            self.boundsCH1903_floor.nw.lon_m - self.boundsCH1903.nw.lon_m
-        )
-        lat_offset_m = round(
-            self.boundsCH1903_floor.nw.lat_m - self.boundsCH1903.nw.lat_m
-        )
-        assert lon_offset_m >= 0
-        assert lat_offset_m <= 0
-
-        x_first_tile_pixel = round(lon_offset_m // self.layer_param.m_per_pixel)
-        y_first_tile_pixel = round(-lat_offset_m // self.layer_param.m_per_pixel)
-
-        assert 0 <= x_first_tile_pixel < self.layer_param.pixel_per_tile
-        assert 0 <= y_first_tile_pixel < self.layer_param.pixel_per_tile
-
-        if self.context.skip_tiff_read:
-            return
-
-        tiff_cache = TiffCache(
-            orux_layer=self.layer_param.orux_layer, nw=self.boundsCH1903_floor.nw
-        )
-        with self._load_image() as img:
-            #
-            # Die Tiles fuer die Karte zusammenkopieren
-            #
-            width = img.width - x_first_tile_pixel
-            height = img.height - y_first_tile_pixel
-            x_count = width // self.layer_param.pixel_per_tile
-            y_count = height // self.layer_param.pixel_per_tile
-            assert x_count > 0
-            assert y_count > 0
-            total = self.context.skip_count(x_count) * self.context.skip_count(y_count)
-            start_s = time.perf_counter()
-            size_bytes = 0
-            png_count = 0
-            # for y in range(y_count):
-            for y_tile in self.context.range(y_count):
-                for x_tile in self.context.range(x_count):
-                    x_tif_pixel = (
-                        x_tile * self.layer_param.pixel_per_tile + x_first_tile_pixel
-                    )
-                    y_tif_pixel = (
-                        y_tile * self.layer_param.pixel_per_tile + y_first_tile_pixel
-                    )
-                    self.debug_pngs.append(
-                        DebugPng(
-                            tiff_filename=self.filename.name,
-                            x_tile=x_tile,
-                            y_tile=y_tile,
-                            x_tif_pixel=x_tif_pixel,
-                            y_tif_pixel=y_tif_pixel,
-                        )
-                    )
-                    png_count += 1
-                    if self.context.skip_png_write:
-                        continue
-                    raw_png = extract_tile(
-                        img=img,
-                        topleft_x=x_tif_pixel,
-                        topleft_y=y_tif_pixel,
-                        pixel_per_tile=self.layer_param.pixel_per_tile,
-                        skip_optimize_png=self.context.skip_optimize_png,
-                    )
-                    size_bytes += len(raw_png)
-                    tiff_cache.append(
-                        PngCache(
-                            x_tile=x_tile,
-                            y_tile=y_tile,
-                            raw_png=raw_png,
-                        )
-                    )
-                duration_s = time.perf_counter() - start_s
-                ms_per_tile = 1000.0 * duration_s / png_count
-                print(
-                    f"{label}. Image {png_count}({total}). Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes"
-                )
-
-        statistics = f"{self.layer_param.name} {self.filename.name}, Total: {png_count}tiles {duration_s:0.0f}s {size_bytes/1000000:0.1f}Mbytes, Per tile: {ms_per_tile:0.0f}ms {size_bytes/png_count/1000:0.1f}kbytes"
-        with self._filename_pickle_png_cache.open("wb") as f:
-            pickle.dump(tiff_cache, f)
-        self._filename_pickle_png_cache.with_suffix(".txt").write_text(statistics)
-
+    # TODO(hans): remove?
     def append_sqlite(
         self, db, boundsCH1903_extrema
-    ):  # pylint: disable=too-many-statements,too-many-branches
+    ): 
         assert isinstance(boundsCH1903_extrema, BoundsCH1903)
         with self._filename_pickle_png_cache.open("rb") as f:
             tiff_cache: TiffCache = pickle.load(f)
