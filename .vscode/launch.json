@@ -43,12 +43,6 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "Python: test_unpickle.py",
-      "type": "python",
-      "request": "launch",
-      "module": "oruxmap.test_unpickle"
-    },
-    {
       "name": "Python: create_map_CH_samples.py",
       "type": "python",
       "request": "launch",

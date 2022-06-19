@@ -190,7 +190,7 @@ class DebugLogger:
 
 
 @dataclass
-class _Subtiles:
+class Subtiles:
     m_per_tile: int
     subtiles: list = None
     nw_east_m: int = None
@@ -227,14 +227,14 @@ class _Subtiles:
             ),
             color=0,
         )
-        for east_m, north_m, img in self.subtiles:
+        for nw_east_m, nw_north_m, img in self.subtiles:
             pixel_east = int(
-                PIXEL_PER_SUBTILE * (east_m - self.nw_east_m) / m_per_subtile
+                PIXEL_PER_SUBTILE * (nw_east_m - self.nw_east_m) / m_per_subtile
             )
             pixel_north = int(
-                PIXEL_PER_SUBTILE * (north_m - self.nw_north_m) / m_per_subtile
+                PIXEL_PER_SUBTILE * (nw_north_m - self.nw_north_m) / m_per_subtile
             )
-            pixel_south = (subtiles_per_tile - 1) * PIXEL_PER_SUBTILE - pixel_north
+            pixel_south = -pixel_north
             assert 0 <= pixel_east < pixel_per_tile
             assert 0 <= pixel_south < pixel_per_tile
             img_tile.paste(
@@ -272,7 +272,7 @@ class MapScale:
         )
         return filebase.with_suffix(".db")
 
-    def sqlite_fill_subtiles(self):
+    def sqlite_fill_subtiles(self) -> None:
         if self.filename_subtiles_sqlite.exists():
             return
 
@@ -336,7 +336,7 @@ class MapScale:
                 )
                 tiff_image_converter.create_subtiles(db=db)
 
-    def sqlite_subtiles_to_tiles(self):
+    def sqlite_subtiles_to_tiles(self) -> None:
         if self.filename_tiles_sqlite.exists():
             return
 
@@ -368,14 +368,12 @@ class MapScale:
                     m = db_subtiles.select_int(select=f"{oper}({direccion})")
                     return sign * m_per_tile * (sign * m // m_per_tile)
 
-                # min_north_m = db_subtiles.select_int(select="min(north_m)")
-                # min_north_m_rounded = -m_per_tile * (-min_north_m // m_per_tile)
                 min_nw_north_m_rounded = get_rounded(north=True, select_max=False)
                 max_nw_north_m_rounded = get_rounded(north=True, select_max=True)
                 min_nw_east_m_rounded = get_rounded(north=False, select_max=False)
                 max_nw_east_m_rounded = get_rounded(north=False, select_max=True)
 
-                def iter_horizontal(top_nw_north_m: int) -> Iterable[_Subtiles]:
+                def iter_horizontal(top_nw_north_m: int) -> Iterable[Subtiles]:
                     # We loop over a horizontal strip which has the height of one tile
                     limit_vertical_stripe = f"nw_north_m <= {top_nw_north_m} and nw_north_m > {top_nw_north_m-m_per_tile}"
                     limit_horizontal_boundries = f"nw_east_m <= {max_nw_east_m_rounded} and nw_east_m >= {min_nw_east_m_rounded}"
@@ -383,9 +381,9 @@ class MapScale:
                         where=limit_vertical_stripe
                         + " and "
                         + limit_horizontal_boundries,
-                        order="nw_east_m, nw_north_m",
+                        order="nw_east_m, nw_north_m desc",
                     )
-                    subtiles = _Subtiles(m_per_tile=m_per_tile)
+                    subtiles = Subtiles(m_per_tile=m_per_tile)
 
                     while True:
                         try:
@@ -421,8 +419,34 @@ class MapScale:
                             nw_north_m=subtiles.nw_north_m,
                             skip_optimize_png=self.orux_maps.context.skip_optimize_png,
                         )
+                        self.unittest_dump(subtiles=subtiles, img=img)
 
-    def create_map(self):
+    def unittest_dump(  # pylint: disable=too-many-arguments
+        self,
+        subtiles: Subtiles,
+        img=PIL.Image.Image,
+    ) -> None:
+        for probe_layer, probe_nw_east_m, probe_nw_north_m in (
+            ("0100", 2690000, 1250000),  # Does never trigger...
+            ("0100", 2690000, 1245000),
+            ("0100", 2690000, 1215000),
+        ):
+            if (
+                probe_nw_east_m == subtiles.nw_east_m
+                and probe_nw_north_m == subtiles.nw_north_m
+                and probe_layer == self.layer_param.name
+            ):
+                filename = (
+                    DIRECTORY_TESTRESULTS
+                    / f"{self.layer_param.name}-tiles-{subtiles.nw_east_m}_{subtiles.nw_north_m}.txt"
+                )
+
+                with filename.open("w") as f:
+                    f.write(f"  nw_east_m={subtiles.nw_east_m}\n")
+                    f.write(f"  nw_north_m={subtiles.nw_north_m}\n")
+                img.save(filename.with_suffix(".png"))
+
+    def create_map(self) -> None:
         layer_param = self.layer_param
 
         with SqliteTilesPng(
@@ -430,21 +454,19 @@ class MapScale:
             pixel_per_tile=layer_param.pixel_per_tile,
         ) as db_tiles:
             db_tiles.connect()
+            m_per_tile = int(layer_param.m_per_tile)
 
             min_nw_east_m = db_tiles.select_int(select="min(nw_east_m)")
-            max_nw_east_m = db_tiles.select_int(select="max(nw_east_m)")
-            min_nw_north_m = db_tiles.select_int(select="min(nw_north_m)")
             max_nw_north_m = db_tiles.select_int(select="max(nw_north_m)")
 
-            max_nw_east_m += self.layer_param.m_per_tile
-            max_nw_north_m += self.layer_param.m_per_tile
+            max_se_east_m = db_tiles.select_int(select="max(nw_east_m)") + m_per_tile
+            min_se_north_m = db_tiles.select_int(select="min(nw_north_m)") - m_per_tile
 
-            m_per_tile = int(layer_param.m_per_tile)
-            assert (max_nw_east_m - min_nw_east_m) % m_per_tile == 0
-            assert (max_nw_north_m - min_nw_north_m) % m_per_tile == 0
+            assert (max_se_east_m - min_nw_east_m) % m_per_tile == 0
+            assert (max_nw_north_m - min_se_north_m) % m_per_tile == 0
 
             nw = CH1903(lon_m=float(min_nw_east_m), lat_m=float(max_nw_north_m))
-            se = CH1903(lon_m=float(max_nw_east_m), lat_m=float(min_nw_north_m))
+            se = CH1903(lon_m=float(max_se_east_m), lat_m=float(min_se_north_m))
             boundsCH1903_extrema = BoundsCH1903(nw=nw, se=se, valid_data=True)
 
             boundsCH1903_extrema.assertIsNorthWest()
@@ -475,18 +497,9 @@ class MapScale:
                 maxLon=boundsWGS84.southEast.lon_deg,
             )
 
-            # TODO(hans): Verify 'desc'
             for nw_east_m, nw_north_m, img in db_tiles.select(
-                where="true", order="nw_east_m, nw_north_m desc", raw=True
+                where="true", order="nw_east_m, nw_north_m", raw=True
             ):
-                # Emirically fix an offset
-                # It would be much better to find the root cause and fix that
-                # north_m += self.layer_param.m_per_tile
-                nw_north_m += (
-                    self.layer_param.m_per_tile
-                    - self.layer_param.m_per_pixel * PIXEL_PER_SUBTILE
-                )
-
                 lon_offset_m = nw_east_m - boundsCH1903_extrema.nw.lon_m
                 lat_offset_m = boundsCH1903_extrema.nw.lat_m - nw_north_m
                 lon_offset_m = round(lon_offset_m)

@@ -1,6 +1,14 @@
 # orux_swisstopo
 
-2021-04-18, Hans Märki
+## 2021-06-19, Hans Märki
+
+Rewrite a big part. All tifs will first be devided in subtiles of 100x100px.
+Then these subtiles are reassembled to tiles of 1000x1000.
+
+This fixes `oruxmap/doc/bug`,
+
+
+## 2021-04-18, Hans Märki
 
 This scripts creates a offline map of the pixelmap of https://map.geo.admin.ch
 
@@ -10,7 +18,7 @@ Now copy the two resulting files `CH_SwissTopo.otrk2.xml` and `OruxMapsImages.db
 
 The map may be found now in Orux Maps under `OFFLINE` maps.
 
-# 2022-04-24, Hans Märki
+## 2022-04-24, Hans Märki
 
 The geographical pixel location of the swiss topo images are sometime not aligned (1:200'000 for example).
 It would be easier, if all images could be concatinated into one big image.
