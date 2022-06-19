@@ -25,7 +25,15 @@ def get_contextB():
     return context
 
 
-if __name__ == "__main__":
+def main():
+    if False:
+        context = get_contextB()
+        with OruxMap("CH_samples_wetzikon_25k_up", context=context) as oruxmap:
+
+            oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
+        
+        return
+
     for context in (
         get_contextA(),
         get_contextB(),
@@ -35,3 +43,7 @@ if __name__ == "__main__":
 
         with OruxMap("CH_samples_wetzikon_10k", context=context) as oruxmap:
             oruxmap.create_layers(iMasstabMin=10, iMasstabMax=10)
+
+
+if __name__ == "__main__":
+    main()

@@ -14,7 +14,7 @@ context = Context()
 # context.skip_png_write = True
 context.multiprocessing = False
 
-if __name__ == "__main__":
+def main():
     with OruxMap(f"CH_SwissTopo", context=context) as oruxmap:
         oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
 
@@ -22,3 +22,6 @@ if __name__ == "__main__":
         # The maps in 10k scale take up a few hundred gigabytes
         with OruxMap(f"CH_SwissTopo10k", context=context) as oruxmap:
             oruxmap.create_layers(iMasstabMin=10, iMasstabMax=10)
+
+if __name__ == "__main__":
+    main()

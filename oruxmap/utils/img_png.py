@@ -3,7 +3,8 @@ import io
 import PIL.Image
 
 
-def _save_purge_palette(fOut, img, skip_optimize_png):
+# TODO(hans): merge with method below
+def _save_purge_palette(fOut, img, skip_optimize_png)->None:
     if skip_optimize_png:
         # optimize=False, compress_level=0: 8ms 480.6kbytes
         # optimize=False, compress_level=1: 13ms 136.7kbytes
@@ -33,8 +34,13 @@ def _save_purge_palette(fOut, img, skip_optimize_png):
     # 25k, optimize=False, compress_level=8: 22ms 9.3kbytes
     img.save(fOut, format="PNG", optimize=False, compress_level=8)
 
+def convert_to_png_raw(img, skip_optimize_png: bool) -> bytes:
+    with io.BytesIO() as fOut:
+        _save_purge_palette(fOut=fOut, img=img, skip_optimize_png=skip_optimize_png)
+        return fOut.getvalue()
 
-def extract_tile(img, topleft_x, topleft_y, pixel_per_tile, skip_optimize_png):
+# TODO(hans): obsolete
+def extract_tile(img, topleft_x:int, topleft_y:int, pixel_per_tile:int, skip_optimize_png:bool)-> bytes:
     assert 0 <= topleft_x < img.width
     assert 0 <= topleft_y < img.height
     bottomright_x = topleft_x + pixel_per_tile
@@ -42,6 +48,6 @@ def extract_tile(img, topleft_x, topleft_y, pixel_per_tile, skip_optimize_png):
     assert pixel_per_tile <= bottomright_x <= img.width
     assert pixel_per_tile <= bottomright_y <= img.height
     im_crop = img.crop((topleft_x, topleft_y, bottomright_x, bottomright_y))
-    fOut = io.BytesIO()
-    _save_purge_palette(fOut=fOut, img=im_crop, skip_optimize_png=skip_optimize_png)
-    return fOut.getvalue()
+    with io.BytesIO() as fOut :
+        _save_purge_palette(fOut=fOut, img=im_crop, skip_optimize_png=skip_optimize_png)
+        return fOut.getvalue()

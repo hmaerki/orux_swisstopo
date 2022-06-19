@@ -8,7 +8,8 @@ class LayerParams:
     m_per_pixel: float
     tiff_filename: str = None
     tiff_url: str = None
-    pixel_per_tile: int = 400
+    # pixel_per_tile: int = 400
+    pixel_per_tile: int = 1000
 
     @property
     def name(self):

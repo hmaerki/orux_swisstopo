@@ -1,0 +1,20 @@
+import pathlib
+
+DIRECTORY_ORUX_SWISSTOPO = pathlib.Path(__file__).absolute().parent.parent
+DIRECTORY_RESOURCES = DIRECTORY_ORUX_SWISSTOPO / "resources"
+DIRECTORY_BASE = DIRECTORY_ORUX_SWISSTOPO.parent
+DIRECTORY_TARGET = DIRECTORY_BASE / "target"
+DIRECTORY_CACHE_TIF = DIRECTORY_TARGET / "cache_tif"
+# TODO(hans): Remove
+DIRECTORY_CACHE_PNG = DIRECTORY_TARGET / "cache_png"
+DIRECTORY_CACHE_TILES = DIRECTORY_TARGET / "cache_tiles"
+DIRECTORY_LOGS = DIRECTORY_TARGET / "logs"
+DIRECTORY_MAPS = DIRECTORY_TARGET / "maps"
+
+DIRECTORY_TARGET.mkdir(exist_ok=True)
+DIRECTORY_CACHE_TIF.mkdir(exist_ok=True)
+DIRECTORY_CACHE_PNG.mkdir(exist_ok=True)
+DIRECTORY_CACHE_TILES.mkdir(exist_ok=True)
+DIRECTORY_LOGS.mkdir(exist_ok=True)
+DIRECTORY_MAPS.mkdir(exist_ok=True)
+assert DIRECTORY_MAPS.exists()
