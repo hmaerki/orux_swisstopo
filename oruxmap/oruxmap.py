@@ -29,15 +29,12 @@ https://www.swisstopo.admin.ch/content/swisstopo-internet/de/online/calculation-
 http://de.wikipedia.org/wiki/WGS_84
   World Geodetic System 1984 (WGS 84)
 """
-import math
 import time
 import shutil
 import pathlib
-import pickle
 import sqlite3
 
 from dataclasses import dataclass
-from multiprocessing import Pool
 from typing import Iterable
 
 import requests
@@ -46,12 +43,11 @@ import rasterio
 import rasterio.plot
 
 from oruxmap.utils import projection
-from oruxmap.utils.projection import CH1903, BoundsCH1903, create_boundsCH1903_extrema
+from oruxmap.utils.projection import CH1903, BoundsCH1903
 from oruxmap.utils.context import Context
 from oruxmap.utils.orux_xml_otrk2 import OruxXmlOtrk2
 from oruxmap.utils.download_zip_and_extract import DownloadZipAndExtractTiff
 from oruxmap.layers_switzerland import LIST_LAYERS, LayerParams
-from oruxmap.utils.img_png import convert_to_png_raw
 from oruxmap.utils.sqlite_titles import SqliteTilesPng, SqliteTilesRaw
 from oruxmap.utils.constants_directories import (
     DIRECTORY_MAPS,
@@ -59,15 +55,12 @@ from oruxmap.utils.constants_directories import (
     DIRECTORY_RESOURCES,
     DIRECTORY_CACHE_TILES,
     DIRECTORY_CACHE_TIF,
+    DIRECTORY_LOGS,
 )
 
 PIL.Image.MAX_IMAGE_PIXELS = None
 
 PIXEL_PER_SUBTILE = 100
-
-
-def directory_png_cache(layer_param: LayerParams, context: Context):
-    return DIRECTORY_CACHE_PNG / context.append_version("png") / layer_param.name
 
 
 class DurationLogger:
@@ -216,6 +209,7 @@ class DebugLogger:
         #         for debug_png in tiff_image.debug_pngs:
         #             f.write(f"{debug_png.csv},{tiff_image.boundsCH1903.csv}\n")
 
+
 @dataclass
 class _Subtiles:
     m_per_tile: int
@@ -360,7 +354,6 @@ class MapScale:
                 )
                 tiff_image_converter.create_subtiles(db=db)
 
-
     def sqlite_subtiles_to_tiles(self):
         if self.filename_tiles_sqlite.exists():
             return
@@ -386,19 +379,19 @@ class MapScale:
                 m_per_subtile = int(layer_param.m_per_pixel * PIXEL_PER_SUBTILE)
                 m_per_tile = int(layer_param.m_per_tile)
 
-                def get_rounded(north: bool, max: bool):
-                    oper = "max" if max else "min"
-                    sign = 1 if max else -1
+                def get_rounded(north: bool, select_max: bool):
+                    oper = "max" if select_max else "min"
+                    sign = 1 if select_max else -1
                     direccion = "north_m" if north else "east_m"
                     m = db_subtiles.select_int(select=f"{oper}({direccion})")
                     return sign * m_per_tile * (sign * m // m_per_tile)
 
                 # min_north_m = db_subtiles.select_int(select="min(north_m)")
                 # min_north_m_rounded = -m_per_tile * (-min_north_m // m_per_tile)
-                min_north_m_rounded = get_rounded(north=True, max=False)
-                max_north_m_rounded = get_rounded(north=True, max=True)
-                min_east_m_rounded = get_rounded(north=False, max=False)
-                max_east_m_rounded = get_rounded(north=False, max=True)
+                min_north_m_rounded = get_rounded(north=True, select_max=False)
+                max_north_m_rounded = get_rounded(north=True, select_max=True)
+                min_east_m_rounded = get_rounded(north=False, select_max=False)
+                max_east_m_rounded = get_rounded(north=False, select_max=True)
 
                 def iter_horizontal(top_north_m: int) -> Iterable[_Subtiles]:
                     # We loop over a horizontal strip which has the height of one tile
@@ -435,12 +428,6 @@ class MapScale:
                     min_north_m_rounded, max_north_m_rounded, m_per_tile
                 ):
                     for subtiles in iter_horizontal(top_north_m=top_north_m):
-                        if False:
-                            # img_tile.show("Hallo")
-                            import io
-
-                            img_tile_png = PIL.Image.open(io.BytesIO(img_tile_png_raw))
-                            img_tile_png.show("PNG")
                         img = subtiles.image(
                             subtiles_per_tile=subtiles_per_tile,
                             pixel_per_tile=layer_param.pixel_per_tile,
@@ -530,32 +517,7 @@ class MapScale:
                     ),
                 )
 
-@dataclass
-class PngCache:
-    x_tile: int
-    y_tile: int
-    raw_png: bytes
 
-# TODO(hans): remove?
-@dataclass
-class TiffCache:
-    list_png: list
-    orux_layer: int
-    nw: CH1903
-
-    def __init__(self, nw: CH1903, orux_layer: int):
-        assert isinstance(nw, CH1903)
-        assert isinstance(orux_layer, int)
-        self.nw = nw
-        self.orux_layer = orux_layer
-        self.list_png = []
-
-    def append(self, png_cache: PngCache):
-        assert isinstance(png_cache, PngCache)
-        self.list_png.append(png_cache)
-
-
-# TODO(hans): remove?
 @dataclass
 class TiffImageAttributes:
     filename: pathlib.Path
@@ -601,7 +563,6 @@ class TiffImageAttributes:
             boundsCH1903_floor = boundsCH1903.floor(
                 floor_m=layer_param.m_per_tile, valid_data=layer_param.valid_data
             )
-            # TODO(hans): Remove
             boundsCH1903_floor.assertIsNorthWest()
             if not boundsCH1903.equals(boundsCH1903_floor):
                 print(f"{filename.relative_to(DIRECTORY_BASE)}: cropped")
@@ -616,7 +577,7 @@ class TiffImageAttributes:
             boundsCH1903_floor=boundsCH1903_floor,
         )
 
-# TODO(hans): remove?
+
 class TiffImageConverter:
     def __init__(self, context, tiff_attrs):
         assert isinstance(context, Context)
@@ -647,14 +608,6 @@ class TiffImageConverter:
                 img = img.convert("RGB")
             return img
 
-    # TODO(hans): remove
-    @property
-    def _filename_pickle_png_cache(self):
-        return (
-            directory_png_cache(layer_param=self.layer_param, context=self.context)
-            / self.filename.with_suffix(".pickle").name
-        )
-
     def create_subtiles(self, db: SqliteTilesRaw) -> None:
         with self._load_image() as img:
             if (img.width % PIXEL_PER_SUBTILE != 0) or (
@@ -680,35 +633,3 @@ class TiffImageConverter:
                         )
                     )
                     db.add_subtile(img=img_subtile, east_m=east_m, north_m=north_m)
-
-    # TODO(hans): remove?
-    def append_sqlite(
-        self, db, boundsCH1903_extrema
-    ): 
-        assert isinstance(boundsCH1903_extrema, BoundsCH1903)
-        with self._filename_pickle_png_cache.open("rb") as f:
-            tiff_cache: TiffCache = pickle.load(f)
-
-        lon_offset_m = tiff_cache.nw.lon_m - boundsCH1903_extrema.nw.lon_m
-        lat_offset_m = boundsCH1903_extrema.nw.lat_m - tiff_cache.nw.lat_m
-        lon_offset_m = round(lon_offset_m)
-        lat_offset_m = round(lat_offset_m)
-        assert lon_offset_m >= 0
-        assert lat_offset_m >= 0
-
-        x_tile_offset = round(lon_offset_m // self.layer_param.m_per_tile)
-        y_tile_offset = round(lat_offset_m // self.layer_param.m_per_tile)
-        assert x_tile_offset >= 0
-        assert y_tile_offset >= 0
-
-        for png in tiff_cache.list_png:
-            b = sqlite3.Binary(png.raw_png)
-            db.execute(
-                "insert or replace into tiles values (?,?,?,?)",
-                (
-                    png.x_tile + x_tile_offset,
-                    png.y_tile + y_tile_offset,
-                    tiff_cache.orux_layer,
-                    b,
-                ),
-            )

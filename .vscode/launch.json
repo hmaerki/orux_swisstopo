@@ -13,9 +13,10 @@
       "args": [
         "--rcfile=${workspaceFolder}/.pylintrc",
         "--verbose",
-        "*.py",
-        "oruxmap",
-        "oruxmap/utils"
+        "create_map_CH_samples.py",
+        "create_map_CH_SwissTopo.py",
+        "oruxmap/",
+        "oruxmap/utils/"
       ],
       "console": "integratedTerminal"
     },
@@ -28,9 +29,9 @@
       "args": [
         "--config",
         "${workspaceFolder}/.blackconfig.yaml",
-        "*.py",
-        "oruxmap/*.py",
-        "oruxmap/utils/*.py"
+        ".",
+        "oruxmap/",
+        "oruxmap/utils/"
       ],
       "console": "integratedTerminal"
     },

@@ -1,8 +1,9 @@
 ﻿"""
   Dieses Script extrahiert alle Images aus 'Hombrechtikon.otrk2.xml'
 """
-import sqlite3
 import sys
+import pathlib
+import sqlite3
 
 db = sqlite3.connect("OruxMapsImages.db")
 c = db.cursor()
@@ -12,6 +13,6 @@ for row in c:
     y = row[1]
     z = row[2]
     image = row[3]
-    open(f"{x:03d}-{y:03d}-{z:03d}.jpg", "wb").write(image)
+    pathlib.Path(f"{x:03d}-{y:03d}-{z:03d}.jpg").write_bytes(image)
 
 sys.stdin.readline()

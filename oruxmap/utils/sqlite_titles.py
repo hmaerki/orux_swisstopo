@@ -4,7 +4,6 @@ import sqlite3
 import PIL.Image
 
 from oruxmap.utils.img_png import convert_to_png_raw
-from oruxmap.utils.constants_directories import DIRECTORY_BASE
 
 
 class _SqliteTilesBase:

@@ -3,7 +3,7 @@ import io
 import PIL.Image
 
 
-def _convert_to_png_raw(fOut, img, skip_optimize_png)->None:
+def _convert_to_png_raw(fOut, img, skip_optimize_png) -> None:
     if skip_optimize_png:
         # optimize=False, compress_level=0: 8ms 480.6kbytes
         # optimize=False, compress_level=1: 13ms 136.7kbytes
@@ -33,9 +33,8 @@ def _convert_to_png_raw(fOut, img, skip_optimize_png)->None:
     # 25k, optimize=False, compress_level=8: 22ms 9.3kbytes
     img.save(fOut, format="PNG", optimize=False, compress_level=8)
 
+
 def convert_to_png_raw(img, skip_optimize_png: bool) -> bytes:
     with io.BytesIO() as fOut:
         _convert_to_png_raw(fOut=fOut, img=img, skip_optimize_png=skip_optimize_png)
         return fOut.getvalue()
-
-
