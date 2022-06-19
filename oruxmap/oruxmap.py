@@ -32,7 +32,6 @@ http://de.wikipedia.org/wiki/WGS_84
 import time
 import shutil
 import pathlib
-import sqlite3
 
 from dataclasses import dataclass
 from typing import Iterable
@@ -49,6 +48,7 @@ from oruxmap.utils.orux_xml_otrk2 import OruxXmlOtrk2
 from oruxmap.utils.download_zip_and_extract import DownloadZipAndExtractTiff
 from oruxmap.layers_switzerland import LIST_LAYERS, LayerParams
 from oruxmap.utils.sqlite_titles import SqliteTilesPng, SqliteTilesRaw
+from oruxmap.utils.sqlite_orux import SqliteOrux
 from oruxmap.utils.constants_directories import (
     DIRECTORY_MAPS,
     DIRECTORY_BASE,
@@ -95,16 +95,7 @@ class OruxMap:
             filename.unlink()
         self.directory_map.mkdir(parents=True, exist_ok=True)
 
-        self.filename_sqlite = self.directory_map / "OruxMapsImages.db"
-        if self.filename_sqlite.exists():
-            self.filename_sqlite.unlink()
-        self.db = sqlite3.connect(self.filename_sqlite)
-        self.db.execute("pragma journal_mode=OFF")
-        self.db.execute(
-            """CREATE TABLE tiles (x int, y int, z int, image blob, PRIMARY KEY (x,y,z))"""
-        )
-        self.db.execute("""CREATE TABLE "android_metadata" (locale TEXT)""")
-        self.db.execute("""INSERT INTO "android_metadata" VALUES ("de_CH");""")
+        self.db = SqliteOrux(filename_sqlite=self.directory_map / "OruxMapsImages.db")
 
         self.xml_otrk2 = OruxXmlOtrk2(
             filename=self.directory_map / f"{self.map_name}.otrk2.xml",
@@ -120,12 +111,7 @@ class OruxMap:
         self.db.commit()
         if not self.context.skip_sqlite_vacuum:
             with DurationLogger("sqlite.execute('VACUUM')") as duration:
-                before_bytes = self.filename_sqlite.stat().st_size
-                self.db.execute("VACUUM")
-                after_bytes = self.filename_sqlite.stat().st_size
-                print(
-                    f"Vaccum by {100.0*(before_bytes-after_bytes)/before_bytes:0.0f}%"
-                )
+                self.db.vacuum()
         self.db.close()
 
         if not self.context.skip_map_zip:
@@ -493,7 +479,6 @@ class MapScale:
             for east_m, north_m, img in db_tiles.select(
                 where="true", order="east_m, north_m desc", raw=True
             ):
-
                 lon_offset_m = east_m - boundsCH1903_extrema.nw.lon_m
                 lat_offset_m = boundsCH1903_extrema.nw.lat_m - north_m
                 lon_offset_m = round(lon_offset_m)
@@ -506,15 +491,11 @@ class MapScale:
                 assert x_tile_offset >= 0
                 assert y_tile_offset >= 0
 
-                b = sqlite3.Binary(img)
-                self.orux_maps.db.execute(
-                    "insert into tiles values (?,?,?,?)",
-                    (
-                        x_tile_offset,  # png.x_tile + x_tile_offset,
-                        y_tile_offset,  # png.y_tile + y_tile_offset,
-                        layer_param.orux_layer,
-                        b,
-                    ),
+                self.orux_maps.db.insert(
+                    x_tile_offset=x_tile_offset,  # png.x_tile + x_tile_offset,
+                    y_tile_offset=y_tile_offset,  # png.y_tile + y_tile_offset,
+                    orux_layer=layer_param.orux_layer,
+                    img=img,
                 )
 
 

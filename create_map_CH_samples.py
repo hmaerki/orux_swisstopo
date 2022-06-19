@@ -31,7 +31,7 @@ def main():
         with OruxMap("CH_samples_wetzikon_25k_up", context=context) as oruxmap:
 
             # oruxmap.create_layers(iMasstabMin=100, iMasstabMax=100)
-            oruxmap.create_layers(iMasstabMin=25, iMasstabMax=1000)
+            oruxmap.create_layers(iMasstabMin=100, iMasstabMax=100)
 
         return
 
