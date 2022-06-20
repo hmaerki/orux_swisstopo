@@ -98,7 +98,7 @@ class _SqliteTilesBase:
         c.close()
 
 
-class SqliteTilesRaw(_SqliteTilesBase):
+class SqliteTilesRaw_obsolete(_SqliteTilesBase):
     def _tobytes(self, img: PIL.Image.Image, skip_optimize_png: bool) -> bytes:
         return img.tobytes()
 
@@ -120,3 +120,5 @@ class SqliteTilesPng(_SqliteTilesBase):
 
     def _frombytes(self, data: bytes) -> PIL.Image.Image:
         return PIL.Image.open(io.BytesIO(data))
+
+SqliteTilesRaw = SqliteTilesPng
