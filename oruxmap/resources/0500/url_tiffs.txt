@@ -1,3 +1,1 @@
-https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/swiss-map-raster500_2022_500/swiss-map-raster500_2022_500_kgrs_25_2056.tif
-https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/swiss-map-raster500_2022_500/swiss-map-raster500_2022_500_komb_25_2056.tif
 https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk500.noscale/swiss-map-raster500_2022_500/swiss-map-raster500_2022_500_krel_25_2056.tif
