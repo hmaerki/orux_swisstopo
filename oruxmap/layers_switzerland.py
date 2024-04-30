@@ -39,13 +39,7 @@ LIST_LAYERS = (
     #     orux_layer=8,
     #     m_per_pixel=32.0,
     # ),
-    LayerParams(
-        scale=1000,
-        orux_layer=10,
-        tiff_url="https://data.geo.admin.ch/ch.swisstopo.pixelkarte-farbe-pk1000.noscale/data.zip",
-        tiff_filename="SMR1000_KREL.tif",
-        m_per_pixel=50.0,
-    ),
+    LayerParams(scale=1000, orux_layer=10,  m_per_pixel=50.0),
     LayerParams(scale=500, orux_layer=11, m_per_pixel=25.0),
     # Below line will result in bug as the maps are not aligned to 400px
     LayerParams(scale=200, orux_layer=12, m_per_pixel=10.0),

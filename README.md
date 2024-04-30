@@ -1,5 +1,16 @@
 # orux_swisstopo
 
+# 2024-04-30, Hans Märki
+
+Build using pyenv
+
+```bash
+python -m venv .venv_orux
+source .venv_orux/bin/activate
+python -m pip install --upgrade -r requirements.txt
+python create_map_CH_SwissTopo.py
+```
+
 ## 2021-06-19, Hans Märki
 
 Rewrite a big part. All tifs will first be devided in subtiles of 100x100px.
