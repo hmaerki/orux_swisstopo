@@ -1,8 +1,4 @@
-﻿#!/usr/bin/env python3
-
-# pylint: disable=redefined-outer-name
-
-from oruxmap.utils.context import Context
+﻿from oruxmap.utils.context import Context
 from oruxmap.utils.constants_switzerland import tiffs_wetzikon
 from oruxmap.oruxmap import OruxMap
 

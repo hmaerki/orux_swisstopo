@@ -34,7 +34,9 @@ Now copy the two resulting files `CH_SwissTopo.otrk2.xml` and `OruxMapsImages.db
 The map may be found now in Orux Maps under `OFFLINE` maps.
 
 
-## Refactoring rename
+## TODO: Refactoring rename
+
+The names `lon`, `lat` are difficil to understand: Rename!
 
 lon -> east_m
 
