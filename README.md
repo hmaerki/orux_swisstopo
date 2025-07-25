@@ -1,5 +1,9 @@
 # orux_swisstopo
 
+# 2025-07-24, Hans Märki
+
+Retrieved newest links from swisstopo and created CH_SwissTopo.zip 3.2G.
+
 # 2024-04-30, Hans Märki
 
 Build using pyenv
